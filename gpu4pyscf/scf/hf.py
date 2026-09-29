@@ -318,6 +318,13 @@ def _kernel(mf, conv_tol=1e-10, conv_tol_grad=None,
 
         e_diff = abs(e_tot-last_hf_e)
         if(e_diff < conv_tol and norm_gorb < conv_tol_grad):
+            mp_state = getattr(mf, '_mixed_precision_state', None)
+            if mp_state is not None and not mp_state.fp64_tail():
+                # Mixed precision: convergence is accepted only after two
+                # consecutive iterations built entirely in FP64.
+                mp_state.force_fp64('convergence tests met before an FP64 tail')
+                log.info('mixed precision: switching to FP64 before accepting convergence')
+                continue
             scf_conv = True
             break
     else:
@@ -384,19 +391,28 @@ def scf(mf, dm0=None, **kwargs):
         # Initial guess from existing wavefunction
         dm0 = mf.make_rdm1()
 
-    if mf.max_cycle > 0 or mf.mo_coeff is None:
-        mf.converged, mf.e_tot, \
-                mf.mo_energy, mf.mo_coeff, mf.mo_occ = \
-                _kernel(mf, mf.conv_tol, mf.conv_tol_grad,
-                        dm0=dm0, callback=mf.callback,
-                        conv_check=mf.conv_check, **kwargs)
-    else:
-        # Avoid to update SCF orbitals in the non-SCF initialization
-        # (issue #495).  But run regular SCF for initial guess if SCF was
-        # not initialized.
-        mf.e_tot = _kernel(mf, mf.conv_tol, mf.conv_tol_grad,
+    mp_state = None
+    if getattr(mf, 'mixed_precision', None) is not None:
+        from gpu4pyscf.dft import mixed_precision
+        mp_state = mixed_precision.begin(mf)
+    try:
+        if mf.max_cycle > 0 or mf.mo_coeff is None:
+            mf.converged, mf.e_tot, \
+                    mf.mo_energy, mf.mo_coeff, mf.mo_occ = \
+                    _kernel(mf, mf.conv_tol, mf.conv_tol_grad,
                             dm0=dm0, callback=mf.callback,
-                            conv_check=mf.conv_check, **kwargs)[1]
+                            conv_check=mf.conv_check, **kwargs)
+        else:
+            # Avoid to update SCF orbitals in the non-SCF initialization
+            # (issue #495).  But run regular SCF for initial guess if SCF was
+            # not initialized.
+            mf.e_tot = _kernel(mf, mf.conv_tol, mf.conv_tol_grad,
+                                dm0=dm0, callback=mf.callback,
+                                conv_check=mf.conv_check, **kwargs)[1]
+    finally:
+        if mp_state is not None:
+            from gpu4pyscf.dft import mixed_precision
+            mixed_precision.end(mf)
 
     logger.timer(mf, 'SCF', *cput0)
     mf._finalize()
