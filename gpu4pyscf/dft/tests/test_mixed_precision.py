@@ -173,18 +173,26 @@ class KnownValues(unittest.TestCase):
     # -- the convergence contract ----------------------------------------------
     def test_convergence_waits_for_fp64_tail(self):
         # Thresholds the trajectory never meets: the switch can only come
-        # from the convergence guard.
+        # from the convergence guard.  The guard fires only once the SCF
+        # convergence tests are met in FP32, so they are loosened here to lie
+        # above the FP32 noise floor; at conv_tol=1e-10 an FP32 trajectory may
+        # never meet them, and stall/call_cap are the backstops for that case.
         policy = MixedPrecision(xc=True, k=True, xc_switch_tol=1e-14,
                                 k_switch_tol=1e-14, stall=1000, call_cap=1000)
         mf0, e0 = run(mol_p, 'b3lyp')
-        mf1, e1 = run(mol_p, 'b3lyp', policy)
+        mf1 = make_mf(mol_p, 'b3lyp', policy)
+        mf1.conv_tol = 1e-6
+        e1 = mf1.kernel()
+        self.assertTrue(mf1.converged)
         rec = mf1.mixed_precision_record
         self.assertTrue(rec['forced'])
         self.assertEqual(rec['xc'][-2:], ['fp64', 'fp64'])
         self.assertEqual(rec['k'][-2:], ['fp64', 'fp64'])
         self.assertIsNotNone(rec['k_full_rebuild_call'])
         self.assertTrue(rec['fp64_tail'])
-        self.assertAlmostEqual(e1, e0, delta=ETOL)
+        # E is second order in the density error, so an FP64 tail at the
+        # loosened tolerance still lands well within 1e-6 of the tight stock E.
+        self.assertAlmostEqual(e1, e0, delta=1e-6)
 
     # -- refusals ----------------------------------------------------------------
     def test_refuses_uks(self):
