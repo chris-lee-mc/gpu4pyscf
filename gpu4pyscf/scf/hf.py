@@ -322,6 +322,10 @@ def _kernel(mf, conv_tol=1e-10, conv_tol_grad=None,
         if(e_diff < conv_tol and norm_gorb < conv_tol_grad):
             mp_state = getattr(mf, '_mixed_precision_state', None)
             if mp_state is not None and not mp_state.fp64_tail():
+                if mp_state.call == 0:
+                    raise RuntimeError(
+                        'mixed_precision: this get_veff path does not report to '
+                        'the mixed-precision policy; unset mf.mixed_precision')
                 # Mixed precision: convergence is accepted only after two
                 # consecutive iterations built entirely in FP64.
                 mp_state.force_fp64('convergence tests met before an FP64 tail')

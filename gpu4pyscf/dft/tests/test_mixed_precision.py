@@ -125,6 +125,15 @@ class KnownValues(unittest.TestCase):
     def test_r2scan_xc_water(self):
         self._check_mixed(mol_w, 'r2scan', MixedPrecision(xc=True), False)
 
+    def test_r2scan_xc_water_without_density_fitting(self):
+        # The non-DF rks.get_veff path (the DF path is df_jk._DFHF.get_veff).
+        mf0, e0 = run(mol_w, 'r2scan', df=False)
+        mf1, e1 = run(mol_w, 'r2scan', MixedPrecision(xc=True), df=False)
+        self.assertAlmostEqual(e1, e0, delta=ETOL)
+        rec = mf1.mixed_precision_record
+        self.assertIn('fp32', rec['xc'])
+        self.assertTrue(rec['fp64_tail'])
+
     def test_r2scan_xc_paracetamol(self):
         self._check_mixed(mol_p, 'r2scan', MixedPrecision(xc=True), False)
 
