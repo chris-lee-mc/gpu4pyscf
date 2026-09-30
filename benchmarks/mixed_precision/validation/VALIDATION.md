@@ -1,5 +1,17 @@
 # GPU validation of this branch
 
+> **NOT GPU-validated at master.** This branch is the v1.8.1 branch
+> (`mixed-precision-scf-v1.8.1`) rebased onto master `307576f`. The result below was measured on the
+> v1.8.1 branch, not this one. Adapting to master needed three changes:
+> - `get_jk` gained `lr_factor` / `sr_factor`, and FP32 K is now also refused when either is set;
+> - `_DFHF.get_veff`'s range-separated branch was restructured, so the hook now wraps only the
+>   `omega == 0` exchange build;
+> - `_block_loop` lost `strict_grid_order`, because it never skips blocks now.
+>
+> None of these changes has run on a GPU. Master's compiled libraries differ from the 1.8.1
+> wheel, so the overlay method used here does not apply; validating master needs a from-source
+> build.
+
 **Result: PASS**, 2026-09-30, on one NVIDIA RTX PRO 6000 Blackwell Workstation Edition.
 
 - Branch commit tested: `eb5a901f2d8922add275e2009ef47277125a4c87`.

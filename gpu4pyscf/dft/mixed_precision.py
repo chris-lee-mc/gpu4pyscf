@@ -307,10 +307,11 @@ def _build_ao_cache(ni, sorted_mol, grids, nao, ao_deriv, budget):
     nbytes = 0
     ngrids = grids.coords.shape[0]
     p0 = p1 = 0
+    # block_loop yields every grid block in order, including blocks with no
+    # significant AO, so p0:p1 tracks the grid position.
     for ao, idx, weight, _ in ni.block_loop(sorted_mol, grids, nao, ao_deriv,
                                             max_memory=None,
-                                            grid_range=(0, ngrids),
-                                            strict_grid_order=True):
+                                            grid_range=(0, ngrids)):
         p0, p1 = p1, p1 + weight.size
         if len(idx) == 0:
             continue
