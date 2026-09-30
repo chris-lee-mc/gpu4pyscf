@@ -35,10 +35,12 @@ where XC is FP64.
 
 Convergence contract: the SCF may declare convergence only after two
 consecutive iterations whose effective potential was built entirely in FP64.
-Because J/K are built incrementally, the first FP64 K build after an FP32
-phase is a full rebuild, so no FP32 K contribution survives into the
-converged Fock matrix. If the convergence tests pass earlier, the switch is
-forced and the SCF continues.
+If the convergence tests pass earlier, the switch is forced and the SCF
+continues. The density-fitting get_veff (df_jk._DFHF.get_veff) builds J/K
+from the full density every iteration, so no FP32 K contribution survives
+the FP32 phase. The non-DF rks.get_veff builds J incrementally; there the
+first FP64 build after an FP32 phase is a full rebuild. K itself is only
+FP32 with density fitting.
 
 Supported: single GPU, closed-shell RKS, no NLC, no range-separated
 functionals. K additionally requires density fitting. Anything else raises

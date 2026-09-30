@@ -355,7 +355,24 @@ class _DFHF:
 
             elif isinstance(self, hf.RHF):
                 rks.initialize_grids(self, mol, dm)
-                n, exc, vxc = ni.nr_rks(mol, self.grids, self.xc, dm)
+                # Opt-in mixed precision (gpu4pyscf.dft.mixed_precision). This
+                # path builds J/K from the full density every iteration, so no
+                # FP32 K contribution can outlive the FP32 phase.
+                mp_state = getattr(self, '_mixed_precision_state', None)
+                k_prec = 'fp64'
+                res = None
+                if mp_state is not None:
+                    xc_prec, k_prec, _ = mp_state.begin_call()
+                    if xc_prec == 'fp32':
+                        from gpu4pyscf.dft import mixed_precision
+                        res = mixed_precision.nr_rks_fp32(
+                            mp_state, ni, mol, self.grids, self.xc, dm)
+                        if res is None:     # FP32 AO copy did not fit
+                            mp_state._cur['xc'] = 'fp64'
+                if res is None:
+                    res = ni.nr_rks(mol, self.grids, self.xc, dm)
+                n, exc, vxc = res
+                exc_xc = exc
                 log.debug('nelec by numeric integration = %s', n)
                 if self.do_nlc():
                     if ni.libxc.is_nlc(self.xc):
@@ -388,6 +405,10 @@ class _DFHF:
                             vk = self.get_k(mol, dm, hermi, omega=omega, lr_factor=alpha, sr_factor=hyb)
                         else:
                             raise ValueError(f'range_separated_mode = {range_separated_mode} is not supported')
+                    elif mp_state is not None: # omega == 0
+                        with mp_state.k_scope(self.with_df, k_prec):
+                            vj, vk = self.get_jk(mol, dm, hermi)
+                        vk *= hyb
                     else: # omega == 0
                         vj, vk = self.get_jk(mol, dm, hermi)
                         vk *= hyb
@@ -395,6 +416,8 @@ class _DFHF:
                     vxc -= vk * .5
                     exc -= float(cupy.einsum('ij,ji->', dm, vk).real.get()) * .25
                 ecoul = float(cupy.einsum('ij,ji->', dm, vj).real.get()) * .5
+                if mp_state is not None:
+                    mp_state.end_call(exc_xc)
             elif isinstance(self, ghf.GHF):
                 if hermi == 2:  # because rho = 0
                     n, exc, vxc = 0, 0, 0
