@@ -1,0 +1,14 @@
+gpu4pyscf-cuda12x==1.8.1
+pyscf==2.14.0
+cupy-cuda12x==14.1.1
+numpy==2.2.6
+scipy==1.15.3
+gpu4pyscf-libxc-cuda12x==0.8.1
+pyscf-dispersion==1.5.0
+cuda-pathfinder==1.6.0
+h5py==3.16.0
+geometric==1.1.1
+networkx==3.4.2
+six==1.17.0
+packaging==26.3
+setuptools==84.0.0
