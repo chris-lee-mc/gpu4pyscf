@@ -1,0 +1,442 @@
+{
+ "fork": "chris-lee-mc/gpu4pyscf",
+ "sha": "eb5a901f2d8922add275e2009ef47277125a4c87",
+ "base_sha": "5b284c258a4260baef80e3d150b4e7a81a9dbd57",
+ "problems": [],
+ "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+ "pytest_version": "pytest 9.1.1",
+ "git": {
+  "head": "eb5a901f2d8922add275e2009ef47277125a4c87",
+  "base": "5b284c258a4260baef80e3d150b4e7a81a9dbd57",
+  "rc": [
+   0,
+   0,
+   0
+  ]
+ },
+ "changed": [
+  [
+   "M",
+   "gpu4pyscf/df/df_jk.py"
+  ],
+  [
+   "A",
+   "gpu4pyscf/dft/mixed_precision.py"
+  ],
+  [
+   "M",
+   "gpu4pyscf/dft/rks.py"
+  ],
+  [
+   "A",
+   "gpu4pyscf/dft/tests/test_mixed_precision.py"
+  ],
+  [
+   "M",
+   "gpu4pyscf/scf/hf.py"
+  ]
+ ],
+ "installed": {
+  "site": "/usr/local/lib/python3.10/dist-packages",
+  "version": "1.8.1"
+ },
+ "pytest": {
+  "regression_stock": {
+   "rc": 0,
+   "wall_s": 256.1,
+   "counts": {
+    "passed": 42,
+    "failed": 0,
+    "skipped": 0
+   },
+   "failed": {},
+   "tail": [
+    "",
+    "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+    "42 passed, 1 warning in 255.71s (0:04:15)"
+   ]
+  },
+  "regression_branch": {
+   "rc": 0,
+   "wall_s": 168.2,
+   "counts": {
+    "passed": 42,
+    "failed": 0,
+    "skipped": 0
+   },
+   "failed": {},
+   "tail": [
+    "",
+    "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+    "42 passed, 1 warning in 167.80s (0:02:47)"
+   ]
+  },
+  "new_tests": {
+   "rc": 0,
+   "wall_s": 41.9,
+   "counts": {
+    "passed": 21,
+    "failed": 0,
+    "skipped": 0
+   },
+   "failed": {},
+   "tail": [
+    "",
+    "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+    "21 passed, 1 warning in 41.54s"
+   ]
+  }
+ },
+ "overlaid": [
+  {
+   "path": "gpu4pyscf/df/df_jk.py",
+   "sha256": "5283d282eec6acc7"
+  },
+  {
+   "path": "gpu4pyscf/dft/mixed_precision.py",
+   "sha256": "58b330915b44289d"
+  },
+  {
+   "path": "gpu4pyscf/dft/rks.py",
+   "sha256": "e9bf9370502d9122"
+  },
+  {
+   "path": "gpu4pyscf/scf/hf.py",
+   "sha256": "fb600081527ab31d"
+  }
+ ],
+ "regressions": [],
+ "trio": {
+  "cells": [
+   {
+    "mol": "paracetamol",
+    "xc": "r2scan",
+    "e_stock": -515.381479937911,
+    "e_mixed": -515.3814799379103,
+    "abs_de": 6.821210263296962e-13,
+    "cycles_stock": 13,
+    "cycles_mixed": 13,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 9,
+    "n_k_fp32": 0,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": null,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 1.04 GiB",
+    "xc_switch": "|dE_xc|=8.783e-04 < 0.001",
+    "k_switch": "K mixed precision not requested or not a hybrid",
+    "wall_stock_s": 4.563,
+    "wall_mixed_s": 2.532
+   },
+   {
+    "mol": "paracetamol",
+    "xc": "b3lyp",
+    "e_stock": -515.6676423604512,
+    "e_mixed": -515.6676423604507,
+    "abs_de": 4.547473508864641e-13,
+    "cycles_stock": 12,
+    "cycles_mixed": 12,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 10,
+    "n_k_fp32": 8,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": 9,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 1.04 GiB",
+    "xc_switch": "|dE_xc|=2.530e-04 < 0.0003",
+    "k_switch": "|dE_xc|=8.230e-04 < 0.001",
+    "wall_stock_s": 1.987,
+    "wall_mixed_s": 1.086
+   },
+   {
+    "mol": "propranolol",
+    "xc": "r2scan",
+    "e_stock": -827.3346047560126,
+    "e_mixed": -827.3346047560121,
+    "abs_de": 4.547473508864641e-13,
+    "cycles_stock": 13,
+    "cycles_mixed": 13,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 8,
+    "n_k_fp32": 0,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": null,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 2.69 GiB",
+    "xc_switch": "|dE_xc|=6.556e-04 < 0.001",
+    "k_switch": "K mixed precision not requested or not a hybrid",
+    "wall_stock_s": 11.559,
+    "wall_mixed_s": 6.903
+   },
+   {
+    "mol": "propranolol",
+    "xc": "b3lyp",
+    "e_stock": -827.8170690319748,
+    "e_mixed": -827.8170690319726,
+    "abs_de": 2.2737367544323206e-12,
+    "cycles_stock": 12,
+    "cycles_mixed": 12,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 9,
+    "n_k_fp32": 8,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": 9,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 2.69 GiB",
+    "xc_switch": "|dE_xc|=2.878e-04 < 0.0003",
+    "k_switch": "|dE_xc|=4.699e-04 < 0.001",
+    "wall_stock_s": 7.469,
+    "wall_mixed_s": 4.554
+   },
+   {
+    "mol": "celecoxib",
+    "xc": "r2scan",
+    "e_stock": -1668.395049943072,
+    "e_mixed": -1668.3950499430703,
+    "abs_de": 1.8189894035458565e-12,
+    "cycles_stock": 14,
+    "cycles_mixed": 14,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 9,
+    "n_k_fp32": 0,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": null,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 3.43 GiB",
+    "xc_switch": "|dE_xc|=1.668e-04 < 0.001",
+    "k_switch": "K mixed precision not requested or not a hybrid",
+    "wall_stock_s": 16.519,
+    "wall_mixed_s": 9.549
+   },
+   {
+    "mol": "celecoxib",
+    "xc": "b3lyp",
+    "e_stock": -1669.0626236858616,
+    "e_mixed": -1669.062623685857,
+    "abs_de": 4.547473508864641e-12,
+    "cycles_stock": 13,
+    "cycles_mixed": 13,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 11,
+    "n_k_fp32": 8,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": 9,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 3.43 GiB",
+    "xc_switch": "|dE_xc|=8.064e-06 < 0.0003",
+    "k_switch": "|dE_xc|=7.329e-04 < 0.001",
+    "wall_stock_s": 15.367,
+    "wall_mixed_s": 9.069
+   }
+  ],
+  "problems": []
+ }
+}
