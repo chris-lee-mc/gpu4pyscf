@@ -296,7 +296,7 @@ class AOCache(unittest.TestCase):
     def _stock_and_state(self, mol, xc, policy=None):
         mf, _ = run(mol, xc)
         dm = mf.make_rdm1()
-        mf.mixed_precision = policy or MixedPrecision(xc=True)
+        mf.mixed_precision = policy or MixedPrecision(xc=True, ao_cache_fp64=True)
         return mf, dm, mf._numint, mp._SCFState(mf, mf.mixed_precision)
 
     @staticmethod
@@ -328,6 +328,16 @@ class AOCache(unittest.TestCase):
             flat[i] = np.nextafter(float(flat[i]), np.inf)
             n2, e2, v2 = mp.nr_rks_fp64_cached(state, ni, mol_p, mf.grids, xc, dm)
             self.assertFalse(self._same_bits(v2, v0), xc)
+
+    def test_cache_is_opt_in(self):
+        self.assertIs(MixedPrecision().ao_cache_fp64, False)
+        mf, _ = run(mol_w, 'r2scan', MixedPrecision(xc=True))
+        r = mf.mixed_precision_record
+        self.assertEqual(r['ao_cache_tier'], 'fp32')
+        self.assertEqual(r['ao_cache_bytes64'], 0)
+        self.assertEqual(r['xc_fp64_cached'], 0)
+        mf, _ = run(mol_w, 'wb97m-v', MixedPrecision(vv10=True))
+        self.assertIsNone(mf.mixed_precision_record['ao_cache_tier'])
 
     def _on_off(self, mol, xc, policy_kw):
         mf0, e0 = run(mol, xc, MixedPrecision(ao_cache_fp64=False, **policy_kw))
@@ -366,12 +376,12 @@ class AOCache(unittest.TestCase):
         orig = mp._free_device_bytes
         mp._free_device_bytes = lambda: free
         try:
-            return run(mol_w, xc, MixedPrecision(xc=True))
+            return run(mol_w, xc, MixedPrecision(xc=True, ao_cache_fp64=True))
         finally:
             mp._free_device_bytes = orig
 
     def test_tier_fp32_when_fp64_does_not_fit(self):
-        mf, _ = run(mol_w, 'r2scan', MixedPrecision(xc=True))
+        mf, _ = run(mol_w, 'r2scan', MixedPrecision(xc=True, ao_cache_fp64=True))
         nvals = mf.mixed_precision_record['ao_cache_bytes32'] // 4
         self.assertGreater(nvals, 0)
         # budget = 0.7 * free = 8 bytes per value: the FP32 copy fits, 12 B do not
