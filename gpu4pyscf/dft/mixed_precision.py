@@ -32,12 +32,15 @@ then returns to FP64 before convergence can be accepted.
   (gpu4pyscf.dft.vv10_mixed). After the switch every call runs a df64
   (FP32-pair, ~48-bit) kernel instead; there is no stock FP64 tail.
 
-AO cache (``ao_cache_fp64=True``, the default): the AO values of every grid
-block are evaluated once per SCF and kept in FP64, with an FP32 mirror while
-XC is FP32. Every FP64 XC call, including those of k- or vv10-only policies,
-then runs numint.nr_rks's own kernels on the cached blocks instead of
-re-evaluating them, with a bitwise-identical result. When the cache does not
-fit, those calls go through numint.nr_rks unchanged (recorded).
+AO cache (``ao_cache_fp64=True``, opt-in, off by default): the AO values of
+every grid block are evaluated once per SCF and kept in FP64, with an FP32
+mirror while XC is FP32. Every FP64 XC call, including those of k- or
+vv10-only policies, then runs numint.nr_rks's own kernels on the cached
+blocks instead of re-evaluating them, with a bitwise-identical result. It
+costs 8 bytes per AO value (12 during the FP32 phase) of device memory, so it
+is used only when it fits the budget (ao_cache_mem_fraction of the free
+memory of the device or MIG instance); otherwise those calls go through
+numint.nr_rks unchanged, and the record says which.
 
 Each component switches one way when the change in its energy (E_xc for XC
 and K, E_nlc for VV10) between successive iterations falls below its
@@ -123,7 +126,7 @@ class MixedPrecision:
     def __init__(self, xc=False, k=False, vv10=False, xc_switch_tol=XC_SWITCH_TOL,
                  k_switch_tol=K_SWITCH_TOL, vv10_switch_tol=VV10_SWITCH_TOL,
                  stall=SWITCH_STALL, call_cap=SWITCH_CALL_CAP,
-                 ao_cache_mem_fraction=AO_CACHE_MEM_FRACTION, ao_cache_fp64=True):
+                 ao_cache_mem_fraction=AO_CACHE_MEM_FRACTION, ao_cache_fp64=False):
         self.xc = bool(xc)
         self.k = bool(k)
         self.vv10 = bool(vv10)
