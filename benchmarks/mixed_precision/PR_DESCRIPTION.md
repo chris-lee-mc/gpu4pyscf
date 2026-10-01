@@ -186,7 +186,7 @@ certificate in band on the last call); the convergence guard; a perturbed df64 r
 fail the certificate; an SCF that raises; each refusal; and the default policy as stock. The 21
 existing tests in `test_mixed_precision.py` are unchanged.
 
-**GPU validation: PASS** on one RTX PRO 6000 at `906043fd`
+**GPU validation: PASS** on the v1.8.1 branch, **not on this master copy**, on one RTX PRO 6000 at `906043fd`
 (`benchmarks/mixed_precision/validation/VALIDATION-vv10.md`):
 - the base files are byte-identical to the 1.8.1 wheel;
 - both kernels are bitwise identical on the GPU to their NumPy emulations;

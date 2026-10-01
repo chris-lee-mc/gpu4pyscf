@@ -1,5 +1,15 @@
 # GPU validation of the VV10 component
 
+> **NOT GPU-validated at master.** This branch (`mixed-precision-vv10-master`) is the VV10 component
+> of `mixed-precision-vv10-v1.8.1`, cherry-picked onto `mixed-precision-scf-master` (`01fdfd0`), which is
+> itself not GPU-validated. The PASS below was measured on the v1.8.1 branch at `906043fd`, not on this
+> one. The cherry-pick applied without conflicts:
+> - the VV10 call in master's restructured `_DFHF.get_veff` RHF branch threads `vv10_kernel`;
+> - `numint._vv10nlc` / `nr_nlc_vxc` are unchanged on master apart from the new keyword.
+>
+> None of this has run on a GPU at master. Master's compiled libraries differ from the 1.8.1 wheel,
+> so the overlay method does not apply.
+
 **Result: PASS**, 2026-10-01, on one NVIDIA RTX PRO 6000 Blackwell Workstation Edition.
 
 - Branch commit tested: `906043fd2c7a6583ba827e6d7348a18c78ae58de` (`mixed-precision-vv10-v1.8.1`).
