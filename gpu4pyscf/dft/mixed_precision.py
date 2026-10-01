@@ -32,6 +32,13 @@ then returns to FP64 before convergence can be accepted.
   (gpu4pyscf.dft.vv10_mixed). After the switch every call runs a df64
   (FP32-pair, ~48-bit) kernel instead; there is no stock FP64 tail.
 
+AO cache (``ao_cache_fp64=True``, the default): the AO values of every grid
+block are evaluated once per SCF and kept in FP64, with an FP32 mirror while
+XC is FP32. Every FP64 XC call, including those of k- or vv10-only policies,
+then runs numint.nr_rks's own kernels on the cached blocks instead of
+re-evaluating them, with a bitwise-identical result. When the cache does not
+fit, those calls go through numint.nr_rks unchanged (recorded).
+
 Each component switches one way when the change in its energy (E_xc for XC
 and K, E_nlc for VV10) between successive iterations falls below its
 threshold. A stall detector and an iteration cap back that up. K is never
@@ -79,13 +86,18 @@ import numpy as np
 import cupy
 
 from gpu4pyscf.lib import logger
-from gpu4pyscf.lib.cupy_helper import add_sparse, take_last2d, transpose_sum
+from gpu4pyscf.lib.cupy_helper import (
+    add_sparse, contract, release_gpu_stack, take_last2d, transpose_sum)
 from gpu4pyscf.dft import vv10_mixed
 from gpu4pyscf.dft.vv10_mixed import VV10_SWITCH_TOL
 
 FP32 = 'fp32'
 FP64 = 'fp64'
 DF64 = 'df64'
+# record['xc_path'] entries: how each call's XC was evaluated
+XC_PATH_FP32 = 'fp32'
+XC_PATH_CACHED = 'fp64-cached'
+XC_PATH_STOCK = 'fp64-stock'
 
 # Default switch thresholds on |E_xc(n) - E_xc(n-1)| (Hartree). Measured
 # settings: 1e-3 for XC on r2SCAN; 3e-4 for XC with 1e-3 for K on B3LYP.
@@ -95,8 +107,11 @@ XC_SWITCH_TOL = 1e-3
 K_SWITCH_TOL = 1e-3
 SWITCH_STALL = 2
 SWITCH_CALL_CAP = 30
-# Largest fraction of free device memory the FP32 AO copy may take. If it
-# does not fit, the XC component stays FP64 for the whole SCF (recorded).
+# Largest fraction of free device memory the AO cache may take. The cache
+# holds an FP64 copy of every AO block (8 B per value) and, while XC is
+# FP32, an FP32 mirror (4 B). If both do not fit, only the FP32 copy is kept
+# and the FP64 tail evaluates AOs as stock does; if that does not fit
+# either, the XC component stays FP64 for the whole SCF. All recorded.
 AO_CACHE_MEM_FRACTION = 0.7
 # Fraction of free device memory for one FP32 chunk of a cderi block.
 K_CHUNK_MEM_FRACTION = 0.25
@@ -108,7 +123,7 @@ class MixedPrecision:
     def __init__(self, xc=False, k=False, vv10=False, xc_switch_tol=XC_SWITCH_TOL,
                  k_switch_tol=K_SWITCH_TOL, vv10_switch_tol=VV10_SWITCH_TOL,
                  stall=SWITCH_STALL, call_cap=SWITCH_CALL_CAP,
-                 ao_cache_mem_fraction=AO_CACHE_MEM_FRACTION):
+                 ao_cache_mem_fraction=AO_CACHE_MEM_FRACTION, ao_cache_fp64=True):
         self.xc = bool(xc)
         self.k = bool(k)
         self.vv10 = bool(vv10)
@@ -118,12 +133,14 @@ class MixedPrecision:
         self.stall = int(stall)
         self.call_cap = int(call_cap)
         self.ao_cache_mem_fraction = float(ao_cache_mem_fraction)
+        self.ao_cache_fp64 = bool(ao_cache_fp64)
 
     def __repr__(self):
         return (f'MixedPrecision(xc={self.xc}, k={self.k}, vv10={self.vv10}, '
                 f'xc_switch_tol={self.xc_switch_tol:g}, '
                 f'k_switch_tol={self.k_switch_tol:g}, '
-                f'vv10_switch_tol={self.vv10_switch_tol:g})')
+                f'vv10_switch_tol={self.vv10_switch_tol:g}, '
+                f'ao_cache_fp64={self.ao_cache_fp64})')
 
 
 class PhaseController:
@@ -257,6 +274,10 @@ class _SCFState:
         self.vv10_kept = None
         self.ao_cache = None
         self.ao_cache_note = ''
+        self.ao_cache_tier = None
+        self.ao_cache_tried = False
+        self.ao_cache_bytes = (0, 0)
+        self.mirror_released_call = None
         self.call = 0
         self.k_ran_fp32 = False
         self.k_rebuilt = False
@@ -264,15 +285,22 @@ class _SCFState:
         self.forced = ''
         self.record = {'policy': repr(policy), 'xc': [], 'k': [],
                        'k_full_rebuild_call': None, 'ao_cache': '', 'forced': '',
-                       'vv10': [], 'vv10_n_masked': [], 'vv10_cert': None}
+                       'vv10': [], 'vv10_n_masked': [], 'vv10_cert': None,
+                       'xc_path': []}
         self._cur = None
 
     # -- per-iteration protocol, driven by rks.get_veff ------------------------
     def begin_call(self):
         self.call += 1
         xc_prec = self.xc_ctrl.precision_for(self.call) if self.xc_on else FP64
-        if xc_prec == FP64 and self.ao_cache is not None:
-            self.ao_cache = None            # release the FP32 AO copy for the FP64 tail
+        cache = self.ao_cache
+        if xc_prec == FP64 and cache is not None and cache.has32:
+            # the FP32 phase is over: release the FP32 copy, keep any FP64 one
+            if cache.has64:
+                cache.drop_mirror()
+            else:
+                self.ao_cache = None
+            self.mirror_released_call = self.call
         k_prec = FP64
         if self.k_on:
             if self.xc_on and xc_prec == FP64:
@@ -287,7 +315,8 @@ class _SCFState:
         if self.vv10_on:
             vv10_prec = DF64 if self.vv10_ctrl.precision_for(self.call) == FP64 else FP32
         self._cur = {'xc': xc_prec, 'k': k_prec, 'k_applied': FP64,
-                     'vv10': vv10_prec, 'vv10_launches': 0, 'vv10_n_masked': None}
+                     'vv10': vv10_prec, 'vv10_launches': 0, 'vv10_n_masked': None,
+                     'xc_path': XC_PATH_STOCK}
         return xc_prec, k_prec, full_rebuild, vv10_prec
 
     def vv10_kernel(self):
@@ -337,6 +366,7 @@ class _SCFState:
                  and cur['vv10'] != FP32)
         self.clean_streak = self.clean_streak + 1 if clean else 0
         self.record['xc'].append(cur['xc'])
+        self.record['xc_path'].append(cur['xc_path'])
         self.record['k'].append(cur['k_applied'])
         self.record['vv10'].append(cur['vv10'])
         self.record['vv10_n_masked'].append(cur['vv10_n_masked'])
@@ -372,10 +402,22 @@ class _SCFState:
             if applied:
                 self._cur['k_applied'] = FP32
 
+    def drop_ao_cache(self, why):
+        '''Release the whole AO cache for the rest of this SCF; later XC calls
+        run as stock does.'''
+        self.ao_cache = None
+        self.ao_cache_note += f'; dropped at call {self.call}: {why}'
+        self.log.warn('mixed_precision: AO cache dropped: %s', why)
+
     def finish(self, mf):
         self.ao_cache = None
         rec = self.record
         rec['ao_cache'] = self.ao_cache_note
+        rec['ao_cache_tier'] = self.ao_cache_tier
+        rec['ao_cache_bytes64'], rec['ao_cache_bytes32'] = self.ao_cache_bytes
+        rec['ao_cache_mirror_released_call'] = self.mirror_released_call
+        rec['xc_fp64_cached'] = rec['xc_path'].count(XC_PATH_CACHED)
+        rec['xc_fp64_stock'] = rec['xc_path'].count(XC_PATH_STOCK)
         rec['xc_switch_call'] = self.xc_ctrl.switch_call
         rec['xc_switch_reason'] = self.xc_ctrl.switch_reason
         rec['k_switch_call'] = self.k_ctrl.switch_call
@@ -443,15 +485,60 @@ def end(mf, failed=False):
 # -- XC quadrature ----------------------------------------------------------
 
 class _AOCache:
-    '''FP32 AO values of every grid block for one SCF, and their grid offsets.'''
-    def __init__(self, blocks, nbytes):
-        self.blocks = blocks        # list of (ao32, idx, p0, p1)
-        self.nbytes = nbytes
+    '''AO values of every non-empty grid block for one SCF, as an FP64 copy,
+    an FP32 copy, or both, with each block's AO indices and grid offsets and
+    what the cache was built for.'''
+    def __init__(self, blocks, has64, has32, opt, coords, ao_deriv, n_empty):
+        self.blocks = blocks        # list of [ao64, ao32, idx, p0, p1]
+        self.has64 = has64
+        self.has32 = has32
+        self.opt = opt
+        self.coords = coords
+        self.ao_deriv = ao_deriv
+        self.n_empty = n_empty
+
+    def blocks32(self):
+        for ao64, ao32, idx, p0, p1 in self.blocks:
+            yield ao32, idx, p0, p1
+
+    def blocks64(self):
+        for ao64, ao32, idx, p0, p1 in self.blocks:
+            yield ao64, idx, p0, p1
+
+    def drop_mirror(self):
+        for b in self.blocks:
+            b[1] = None
+        self.has32 = False
+
+    def mismatch(self, opt, grids, ao_deriv):
+        '''Why this cache cannot serve a call with these inputs, or None.'''
+        if opt is not self.opt:
+            return 'ni.gdftopt is not the one the cache was built for'
+        if grids.coords is not self.coords:
+            return 'grids.coords is not the array the cache was built for'
+        if ao_deriv != self.ao_deriv:
+            return f'ao_deriv {ao_deriv}, cache built for {self.ao_deriv}'
+        return None
 
 
-def _build_ao_cache(ni, sorted_mol, grids, nao, ao_deriv, budget):
+def _free_device_bytes():
+    return (cupy.cuda.runtime.memGetInfo()[0]
+            + cupy.get_default_memory_pool().free_bytes())
+
+
+def _build_ao_cache(ni, opt, grids, ao_deriv, budget, want64, want32):
+    '''Evaluate every AO block once. Returns (cache, tier, note); cache is None
+    when nothing requested fits. With both copies requested and only the FP32
+    one fitting, the FP64 copy is given up whole (tier 'fp32'). A grid with an
+    empty block keeps no FP64 copy: numint.nr_rks skips such a block without
+    advancing its grid offset, which the cached FP64 path cannot reproduce.'''
+    sorted_mol = opt._sorted_mol
+    nao = sorted_mol.nao
     blocks = []
-    nbytes = 0
+    nvals = 0
+    n_empty = 0
+    keep64 = want64
+    why64 = ''
     ngrids = grids.coords.shape[0]
     p0 = p1 = 0
     # block_loop yields every grid block in order, including blocks with no
@@ -461,14 +548,62 @@ def _build_ao_cache(ni, sorted_mol, grids, nao, ao_deriv, budget):
                                             grid_range=(0, ngrids)):
         p0, p1 = p1, p1 + weight.size
         if len(idx) == 0:
+            n_empty += 1
             continue
-        nbytes += ao.size * 4
-        if nbytes > budget:
-            return None, nbytes
-        blocks.append((ao.astype(np.float32), cupy.asarray(idx).copy(), p0, p1))
+        nvals += ao.size
+        if keep64 and nvals * (8 + 4 * want32) > budget:
+            if not want32:
+                return None, None, (f'did not fit: FP64 copy needs > {nvals * 8 / 2**30:.2f} '
+                                    f'GiB, budget {budget / 2**30:.2f} GiB; FP64 XC as stock')
+            keep64 = False
+            why64 = 'FP64 copy and FP32 mirror do not fit'
+            for b in blocks:
+                b[0] = None
+        if want32 and nvals * 4 > budget:
+            return None, None, (f'did not fit: needs > {nvals * 4 / 2**30:.2f} GiB, '
+                                f'budget {budget / 2**30:.2f} GiB; XC stays FP64')
+        blocks.append([ao.copy() if keep64 else None,
+                       ao.astype(np.float32) if want32 else None,
+                       cupy.asarray(idx).copy(), p0, p1])
     if p1 != ngrids:
         raise RuntimeError(f'AO cache covered {p1} of {ngrids} grid points')
-    return _AOCache(blocks, nbytes), nbytes
+    if keep64 and n_empty:
+        keep64 = False
+        why64 = f'{n_empty} empty grid blocks'
+        for b in blocks:
+            b[0] = None
+        if not want32:
+            return None, None, f'not built: {why64}; FP64 XC as stock'
+    tier = {(True, True): 'fp64+fp32', (False, True): 'fp32', (True, False): 'fp64'}[
+        (keep64, want32)]
+    cache = _AOCache(blocks, keep64, want32, opt, grids.coords, ao_deriv, n_empty)
+    cache.nvals = nvals
+    gib64 = nvals * 8 * keep64 / 2**30
+    gib32 = nvals * 4 * want32 / 2**30
+    note = f'built: {gib64 + gib32:.2f} GiB, tier {tier}'
+    if want64 and not keep64:
+        note += f' (no FP64 copy: {why64})'
+    return cache, tier, note
+
+
+def _ensure_ao_cache(state, ni, opt, grids, ao_deriv, want32):
+    '''Build the SCF's AO cache on its first XC call; never retried.'''
+    if state.ao_cache_tried:
+        return state.ao_cache
+    state.ao_cache_tried = True
+    want64 = state.policy.ao_cache_fp64
+    if not (want64 or want32):
+        return None
+    budget = state.policy.ao_cache_mem_fraction * _free_device_bytes()
+    cache, tier, note = _build_ao_cache(ni, opt, grids, ao_deriv, budget, want64, want32)
+    state.ao_cache = cache
+    state.ao_cache_tier = tier
+    state.ao_cache_note = note
+    if cache is not None:
+        state.ao_cache_bytes = (8 * cache.nvals * cache.has64, 4 * cache.nvals * cache.has32)
+    if cache is None or (want64 and not cache.has64):
+        state.log.warn('mixed_precision: AO cache %s', note)
+    return cache
 
 
 def _rho_dot_unfused(a, b, axis=0):
@@ -572,21 +707,11 @@ def nr_rks_fp32(state, ni, mol, grids, xc_code, dms):
     nao = sorted_mol.nao
     ao_deriv = 0 if xctype == 'LDA' else 1
 
-    if state.ao_cache is None:
-        if state.ao_cache_note.startswith('did not fit'):
-            return None
-        free = (cupy.cuda.runtime.memGetInfo()[0]
-                + cupy.get_default_memory_pool().free_bytes())
-        budget = state.policy.ao_cache_mem_fraction * free
-        cache, nbytes = _build_ao_cache(ni, sorted_mol, grids, nao, ao_deriv, budget)
-        if cache is None:
-            state.ao_cache_note = (f'did not fit: needs > {nbytes/2**30:.2f} GiB, '
-                                   f'budget {budget/2**30:.2f} GiB; XC stays FP64')
-            state.log.warn('mixed_precision: FP32 AO copy %s', state.ao_cache_note)
+    cache = _ensure_ao_cache(state, ni, opt, grids, ao_deriv, want32=True)
+    if cache is None or not cache.has32:
+        if not state.xc_ctrl.switched:
             state.xc_ctrl.switch(state.call, 'FP32 AO copy did not fit')
-            return None
-        state.ao_cache = cache
-        state.ao_cache_note = f'built: {nbytes/2**30:.2f} GiB'
+        return None
 
     mo_coeff = getattr(dms, 'mo_coeff', None)
     mo_occ = getattr(dms, 'mo_occ', None)
@@ -604,7 +729,7 @@ def nr_rks_fp32(state, ni, mol, grids, xc_code, dms):
     ngrids = grids.coords.shape[0]
     nvar = {'LDA': 1, 'GGA': 4, 'MGGA': 5}[xctype]
     rho_tot = cupy.zeros((nvar, ngrids))
-    for ao, idx, p0, p1 in state.ao_cache.blocks:
+    for ao, idx, p0, p1 in cache.blocks32():
         if cpos32 is not None:
             rho_tot[:, p0:p1] = _eval_rho_mo32(ao, cupy.take(cpos32, idx, axis=0), xctype)
         else:
@@ -627,10 +752,149 @@ def nr_rks_fp32(state, ni, mol, grids, xc_code, dms):
     rho_tot = den = exc = vxc = wv = None
 
     vmat = cupy.zeros((nao, nao))
-    for ao, idx, p0, p1 in state.ao_cache.blocks:
+    for ao, idx, p0, p1 in cache.blocks32():
         block = _vxc_block32(ao, wv32[:, p0:p1], xctype)
         add_sparse(vmat, block.astype(np.float64), idx)
     vmat = opt.unsort_orbitals(vmat, axis=[0, 1])
     if xctype != 'LDA':
         transpose_sum(vmat)
+    if state._cur is not None:
+        state._cur['xc_path'] = XC_PATH_FP32
+    return nelec, excsum, vmat
+
+
+def nr_rks_fp64_cached(state, ni, mol, grids, xc_code, dms):
+    '''numint.nr_rks (single device, spin 0, hermi=1) on the cached FP64 AO
+    blocks: the statements of nr_rks and _nr_rks_task with block_loop
+    replaced by the cache, so the result is bitwise that of ni.nr_rks.
+
+    Returns (nelec, excsum, vmat), or None when the cache cannot serve this
+    call; the caller then runs ni.nr_rks.'''
+    from gpu4pyscf.dft import numint
+    if not state.policy.ao_cache_fp64:
+        return None
+    if getattr(type(ni), 'nr_rks', None) is not numint.nr_rks:
+        if not state.ao_cache_tried:
+            state.ao_cache_tried = True
+            state.ao_cache_note = f'not built: {type(ni).__name__} overrides nr_rks'
+        return None
+    xctype = ni._xc_type(xc_code)
+    if xctype not in ('LDA', 'GGA', 'MGGA'):
+        return None
+    opt = getattr(ni, 'gdftopt', None)
+    if opt is None:
+        ni.build(mol, grids.coords)
+        opt = ni.gdftopt
+    ao_deriv = 0 if xctype == 'LDA' else 1
+    cache = _ensure_ao_cache(state, ni, opt, grids, ao_deriv, want32=False)
+    if cache is None or not cache.has64:
+        return None
+    why = cache.mismatch(opt, grids, ao_deriv)
+    if why is None and cache.n_empty:
+        why = f'{cache.n_empty} empty grid blocks'
+    ngrids_glob = grids.coords.shape[0]
+    if why is None and numint.gen_grid_range(ngrids_glob, 0) != (0, ngrids_glob):
+        why = 'grid range is not the whole grid'
+    if why is not None:
+        state.drop_ao_cache(why)
+        return None
+
+    # numint.nr_rks
+    mo_coeff = getattr(dms, 'mo_coeff', None)
+    mo_occ = getattr(dms, 'mo_occ', None)
+    if mo_coeff is not None:
+        mo_coeff = opt.sort_orbitals(mo_coeff, axis=[0])
+    else:
+        assert dms.ndim == 2
+        dms = cupy.asarray(dms)
+        dms = opt.sort_orbitals(dms, axis=[0, 1])
+    release_gpu_stack()
+    cupy.cuda.get_current_stream().synchronize()
+
+    # numint._nr_rks_task, device 0, with_lapl=False, hermi=1
+    hermi = 1
+    dm = dms
+    if isinstance(dm, cupy.ndarray):
+        assert dm.ndim == 2
+        dm = cupy.asarray(dm)
+    if mo_coeff is not None:
+        mo_coeff = cupy.asarray(mo_coeff)
+    if mo_occ is not None:
+        mo_occ = cupy.asarray(mo_occ)
+    _sorted_mol = opt._sorted_mol
+    nao = _sorted_mol.nao
+    ngrids_local = ngrids_glob
+    if xctype == 'LDA':
+        rho_tot = cupy.empty([1, ngrids_local])
+    elif xctype == 'GGA':
+        rho_tot = cupy.empty([4, ngrids_local])
+    else:
+        rho_tot = cupy.empty([5, ngrids_local])
+
+    if mo_coeff is None:
+        buf = cupy.empty(numint.MIN_BLK_SIZE * nao)
+        dm_mask_buf = cupy.empty(nao * nao)
+    else:
+        mo_coeff = cupy.asarray(mo_coeff[:, mo_occ > 0], order='C')
+        mo_coeff *= mo_occ[mo_occ > 0]**.5
+        nocc = mo_coeff.shape[1]
+        mo_buf = cupy.empty(nao * nocc)
+        buf = cupy.empty(numint.MIN_BLK_SIZE * max(2 * nocc, nao))
+
+    for ao_mask, idx, p0, p1 in cache.blocks64():
+        nao_sub = len(idx)
+        if mo_coeff is None:
+            dm_mask = dm_mask_buf[:nao_sub**2].reshape(nao_sub, nao_sub)
+            dm_mask = take_last2d(dm, idx, out=dm_mask)
+            rho_tot[:, p0:p1] = numint.eval_rho(_sorted_mol, ao_mask, dm_mask,
+                                                xctype=xctype, hermi=hermi,
+                                                with_lapl=False, buf=buf)
+        else:
+            cpos = mo_buf[:nao_sub * nocc].reshape(nao_sub, nocc)
+            cpos = cupy.take(mo_coeff, idx, axis=0, out=cpos)
+            rho_tot[:, p0:p1] = numint._eval_rho2(ao_mask, cpos, xctype, False, buf=buf)
+    dm_mask_buf = mo_buf = mo_coeff = None
+
+    weights = cupy.asarray(grids.weights[0:ngrids_local])
+    den = rho_tot[0] * weights
+    nelec = float(den.sum())
+    exc, vxc = ni.eval_xc_eff(xc_code, rho_tot, deriv=1, xctype=xctype, spin=0)[:2]
+    vxc = cupy.asarray(vxc, order='C')
+    exc = cupy.asarray(exc, order='C')
+    excsum = float(cupy.dot(den, exc).get())
+    wv = vxc
+    wv *= weights
+    if xctype == 'GGA':
+        wv[0] *= .5
+    if xctype == 'MGGA':
+        wv[[0, 4]] *= .5
+    exc = den = vxc = rho_tot = weights = None
+
+    vtmp_buf = cupy.empty(nao * nao)
+    vmat = cupy.zeros((nao, nao))
+    for ao_mask, idx, p0, p1 in cache.blocks64():
+        nao_sub = len(idx)
+        vtmp = cupy.ndarray((nao_sub, nao_sub), memptr=vtmp_buf.data)
+        if xctype == 'LDA':
+            aow = numint._scale_ao(ao_mask, wv[0, p0:p1], out=buf)
+            add_sparse(vmat, ao_mask.dot(aow.T, out=vtmp), idx)
+        elif xctype == 'GGA':
+            aow = numint._scale_ao(ao_mask, wv[:, p0:p1], out=buf)
+            add_sparse(vmat, ao_mask[0].dot(aow.T, out=vtmp), idx)
+        else:
+            vtmp = numint._tau_dot(ao_mask, ao_mask, wv[4, p0:p1], buf=buf, out=vtmp)
+            aow = numint._scale_ao(ao_mask, wv[:4, p0:p1], out=buf)
+            vtmp = contract('ig,jg->ij', ao_mask[0], aow, beta=1., out=vtmp)
+            add_sparse(vmat, vtmp, idx)
+
+    # numint.nr_rks, after the device reduction (one device: the array itself)
+    vmat = opt.unsort_orbitals(vmat, axis=[0, 1])
+    nelec = sum([nelec])
+    excsum = sum([excsum])
+    if xctype != 'LDA':
+        transpose_sum(vmat)
+    if numint.FREE_CUPY_CACHE:
+        cupy.get_default_memory_pool().free_all_blocks()
+    if state._cur is not None:
+        state._cur['xc_path'] = XC_PATH_CACHED
     return nelec, excsum, vmat

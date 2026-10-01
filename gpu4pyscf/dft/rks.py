@@ -109,6 +109,11 @@ def get_veff(ks, mol=None, dm=None, dm_last=None, vhf_last=None, hermi=1):
             res = mixed_precision.nr_rks_fp32(mp_state, ni, mol, ks.grids, ks.xc, dm)
             if res is None:     # FP32 AO copy did not fit: this and later calls FP64
                 mp_state._cur['xc'] = 'fp64'
+        if res is None and mp_state is not None:
+            # FP64 XC on the SCF's cached AO blocks; bitwise ni.nr_rks
+            from gpu4pyscf.dft import mixed_precision
+            res = mixed_precision.nr_rks_fp64_cached(
+                mp_state, ni, mol, ks.grids, ks.xc, dm)
         if res is None:
             res = ni.nr_rks(mol, ks.grids, ks.xc, dm)
         n, exc, vxc = res
