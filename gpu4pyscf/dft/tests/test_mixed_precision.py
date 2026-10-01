@@ -322,12 +322,13 @@ class AOCache(unittest.TestCase):
                 self.assertEqual(e1, e0, xc)
                 self.assertTrue(self._same_bits(v1, v0), xc)
             # negative control: the path reads the cache, and the comparison
-            # sees a one-ulp change in one cached AO value
-            flat = state.ao_cache.blocks[0][0].ravel()     # a view of the cached block
-            i = int(abs(flat).argmax())
-            flat[i] = np.nextafter(float(flat[i]), np.inf)
+            # sees a 1e-12 relative change of every value in the cache
+            for block in state.ao_cache.blocks:
+                block[0] *= 1 + 1e-12
             n2, e2, v2 = mp.nr_rks_fp64_cached(state, ni, mol_p, mf.grids, xc, dm)
+            n0, e0, v0 = ni.nr_rks(mol_p, mf.grids, xc, dm)
             self.assertFalse(self._same_bits(v2, v0), xc)
+            self.assertNotEqual(e2, e0, xc)
 
     def test_cache_is_opt_in(self):
         self.assertIs(MixedPrecision().ao_cache_fp64, False)
@@ -363,6 +364,17 @@ class AOCache(unittest.TestCase):
             self.assertEqual(r1['ao_cache_mirror_released_call'], r1['xc_switch_call'])
             self.assertEqual(r1['ao_cache_bytes64'], 2 * r1['ao_cache_bytes32'])
             self.assertGreater(r1['ao_cache_bytes32'], 0)
+            # the DF tensor is built before the cache only where get_jk needs it
+            self.assertIs(r1['cderi_prebuilt'], xc == 'b3lyp')
+            self.assertIs(r0['cderi_prebuilt'], False)
+
+    def test_cache_k_only_policy(self):
+        r0, r1 = self._on_off(mol_w, 'b3lyp', {'k': True})
+        self.assertIsNone(r0['ao_cache_tier'])
+        self.assertEqual(r1['ao_cache_tier'], 'fp64')
+        self.assertEqual(r1['xc_path'], ['fp64-cached'] * len(r1['xc']))
+        self.assertIn('fp32', r1['k'])
+        self.assertIs(r1['cderi_prebuilt'], True)
 
     def test_cache_vv10_only_policy(self):
         r0, r1 = self._on_off(mol_w, 'wb97m-v', {'vv10': True})
@@ -419,6 +431,20 @@ class AOCache(unittest.TestCase):
         # dropped for the rest of the SCF, never rebuilt
         self.assertIsNone(mp.nr_rks_fp64_cached(state, ni, mol_w, mf.grids, 'pbe', dm))
 
+    def test_no_fp64_copy_is_built_for_a_grid_with_an_empty_block(self):
+        # decided from the sparsity index alone: no AO is evaluated (ni=None)
+        class Grids:
+            coords = cupy.zeros((3 * MIN_BLK, 3))
+            def get_non0ao_idx(self, opt):
+                return [(0, cupy.arange(n, dtype=np.int32), None, None, None)
+                        for n in (5, 0, 7)]
+        cache, tier, note = mp._build_ao_cache(None, object(), Grids(), 1, 1e15,
+                                               want64=True, want32=False)
+        self.assertIsNone(cache)
+        self.assertIsNone(tier)
+        self.assertIn('1 empty grid blocks', note)
+        self.assertEqual(mp._predict_ao_values(object(), Grids(), 1), (4 * 12 * MIN_BLK, 1))
+
     def test_cache_declines_empty_blocks(self):
         mf, dm, ni, state = self._stock_and_state(mol_w, 'pbe')
         self.assertIsNotNone(mp.nr_rks_fp64_cached(state, ni, mol_w, mf.grids, 'pbe', dm))
@@ -429,6 +455,7 @@ class AOCache(unittest.TestCase):
 
 
 AO_FRACTION = mp.AO_CACHE_MEM_FRACTION
+MIN_BLK = __import__('gpu4pyscf.dft.numint', fromlist=['MIN_BLK_SIZE']).MIN_BLK_SIZE
 
 
 if __name__ == "__main__":

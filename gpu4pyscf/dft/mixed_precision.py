@@ -110,11 +110,12 @@ XC_SWITCH_TOL = 1e-3
 K_SWITCH_TOL = 1e-3
 SWITCH_STALL = 2
 SWITCH_CALL_CAP = 30
-# Largest fraction of free device memory the AO cache may take. The cache
-# holds an FP64 copy of every AO block (8 B per value) and, while XC is
-# FP32, an FP32 mirror (4 B). If both do not fit, only the FP32 copy is kept
-# and the FP64 tail evaluates AOs as stock does; if that does not fit
-# either, the XC component stays FP64 for the whole SCF. All recorded.
+# Largest fraction of free device memory the AO cache may take. With XC
+# FP32 the cache holds an FP32 copy of every AO block (4 B per value); with
+# ao_cache_fp64=True (opt-in) also an FP64 copy (8 B), kept for the FP64
+# calls. The tier is decided from the predicted size before anything is
+# allocated: if the FP64 copy does not fit it is not made; if the FP32 copy
+# does not fit, XC stays FP64 for the whole SCF. All recorded.
 AO_CACHE_MEM_FRACTION = 0.7
 # Fraction of free device memory for one FP32 chunk of a cderi block.
 K_CHUNK_MEM_FRACTION = 0.25
@@ -281,6 +282,7 @@ class _SCFState:
         self.ao_cache_tried = False
         self.ao_cache_bytes = (0, 0)
         self.mirror_released_call = None
+        self.cderi_prebuilt = False
         self.call = 0
         self.k_ran_fp32 = False
         self.k_rebuilt = False
@@ -304,6 +306,8 @@ class _SCFState:
             else:
                 self.ao_cache = None
             self.mirror_released_call = self.call
+            cache = None
+            _release_pool()
         k_prec = FP64
         if self.k_on:
             if self.xc_on and xc_prec == FP64:
@@ -409,12 +413,16 @@ class _SCFState:
         '''Release the whole AO cache for the rest of this SCF; later XC calls
         run as stock does.'''
         self.ao_cache = None
+        _release_pool()
         self.ao_cache_note += f'; dropped at call {self.call}: {why}'
         self.log.warn('mixed_precision: AO cache dropped: %s', why)
 
     def finish(self, mf):
-        self.ao_cache = None
+        if self.ao_cache is not None or self.mirror_released_call is not None:
+            self.ao_cache = None
+            _release_pool()
         rec = self.record
+        rec['cderi_prebuilt'] = self.cderi_prebuilt
         rec['ao_cache'] = self.ao_cache_note
         rec['ao_cache_tier'] = self.ao_cache_tier
         rec['ao_cache_bytes64'], rec['ao_cache_bytes32'] = self.ao_cache_bytes
@@ -456,8 +464,25 @@ def begin(mf):
         return None
     check_supported(mf, policy)
     state = _SCFState(mf, policy)
+    if policy.ao_cache_fp64:
+        state.cderi_prebuilt = _prebuild_cderi(mf)
     mf._mixed_precision_state = state
     return state
+
+
+def _prebuild_cderi(mf):
+    '''With the AO cache opted in, build the DF tensor before the first XC call
+    builds the cache, so that DF places it (device or host) as it would
+    without the cache. Only where the first get_jk would build it anyway: a
+    hybrid functional with density fitting. A non-hybrid computes J without
+    it. The same with_df.build() call get_jk makes. Returns True if built.'''
+    with_df = getattr(mf, 'with_df', None)
+    if with_df is None or getattr(with_df, '_cderi', None) is not None:
+        return False
+    if not mf._numint.libxc.is_hybrid_xc(mf.xc):
+        return False
+    with_df.build()
+    return True
 
 
 def end(mf, failed=False):
@@ -529,20 +554,59 @@ def _free_device_bytes():
             + cupy.get_default_memory_pool().free_bytes())
 
 
+def _release_pool():
+    '''Return the memory of released AO copies to the device, so that later
+    consumers that exclude the memory pool (e.g. a DF build) see it.'''
+    cupy.get_default_memory_pool().free_all_blocks()
+
+
+def _predict_ao_values(opt, grids, ao_deriv):
+    '''(number of AO values block_loop will produce, number of empty blocks),
+    from the grid's AO sparsity index, without evaluating any AO.'''
+    from gpu4pyscf.dft.numint import MIN_BLK_SIZE
+    ngrids = grids.coords.shape[0]
+    comp = 1 if ao_deriv == 0 else (ao_deriv + 1) * (ao_deriv + 2) * (ao_deriv + 3) // 6
+    nvals = n_empty = 0
+    for block_id, entry in enumerate(grids.get_non0ao_idx(opt)):
+        ip0 = block_id * MIN_BLK_SIZE
+        if ip0 >= ngrids:
+            break
+        ng = min(ip0 + MIN_BLK_SIZE, ngrids) - ip0
+        nao_sub = len(entry[1])
+        if nao_sub == 0:
+            n_empty += 1
+        nvals += comp * nao_sub * ng
+    return nvals, n_empty
+
+
 def _build_ao_cache(ni, opt, grids, ao_deriv, budget, want64, want32):
     '''Evaluate every AO block once. Returns (cache, tier, note); cache is None
-    when nothing requested fits. With both copies requested and only the FP32
-    one fitting, the FP64 copy is given up whole (tier 'fp32'). A grid with an
-    empty block keeps no FP64 copy: numint.nr_rks skips such a block without
+    when nothing requested fits. The tier is decided from the predicted size
+    before any copy is allocated: with both copies requested and only the
+    FP32 one fitting, no FP64 copy is made (tier 'fp32'). A grid with an empty
+    block gets no FP64 copy: numint.nr_rks skips such a block without
     advancing its grid offset, which the cached FP64 path cannot reproduce.'''
+    nvals, n_empty = _predict_ao_values(opt, grids, ao_deriv)
+    keep64 = want64
+    why64 = ''
+    if keep64 and n_empty:
+        keep64, why64 = False, f'{n_empty} empty grid blocks'
+    if keep64 and nvals * (8 + 4 * want32) > budget:
+        keep64, why64 = False, ('FP64 copy and FP32 mirror do not fit' if want32
+                                else 'FP64 copy does not fit')
+    if not want32:
+        if not keep64:
+            return None, None, (f'not built: {why64} (needs {nvals * 8 / 2**30:.2f} GiB, '
+                                f'budget {budget / 2**30:.2f} GiB); FP64 XC as stock')
+    elif nvals * 4 > budget:
+        return None, None, (f'did not fit: needs > {nvals * 4 / 2**30:.2f} GiB, '
+                            f'budget {budget / 2**30:.2f} GiB; XC stays FP64')
+
     sorted_mol = opt._sorted_mol
     nao = sorted_mol.nao
     blocks = []
-    nvals = 0
-    n_empty = 0
-    keep64 = want64
-    why64 = ''
     ngrids = grids.coords.shape[0]
+    got = 0
     p0 = p1 = 0
     for ao, idx, weight, _ in ni.block_loop(sorted_mol, grids, nao, ao_deriv,
                                             max_memory=None,
@@ -550,42 +614,34 @@ def _build_ao_cache(ni, opt, grids, ao_deriv, budget, want64, want32):
                                             strict_grid_order=True):
         p0, p1 = p1, p1 + weight.size
         if len(idx) == 0:
-            n_empty += 1
             continue
-        nvals += ao.size
-        if keep64 and nvals * (8 + 4 * want32) > budget:
-            if not want32:
-                return None, None, (f'did not fit: FP64 copy needs > {nvals * 8 / 2**30:.2f} '
-                                    f'GiB, budget {budget / 2**30:.2f} GiB; FP64 XC as stock')
-            keep64 = False
-            why64 = 'FP64 copy and FP32 mirror do not fit'
-            for b in blocks:
-                b[0] = None
-        if want32 and nvals * 4 > budget:
-            return None, None, (f'did not fit: needs > {nvals * 4 / 2**30:.2f} GiB, '
-                                f'budget {budget / 2**30:.2f} GiB; XC stays FP64')
+        got += ao.size
+        if got > nvals:
+            break
         blocks.append([ao.copy() if keep64 else None,
                        ao.astype(np.float32) if want32 else None,
                        cupy.asarray(idx).copy(), p0, p1])
-    if p1 != ngrids:
-        raise RuntimeError(f'AO cache covered {p1} of {ngrids} grid points')
-    if keep64 and n_empty:
-        keep64 = False
-        why64 = f'{n_empty} empty grid blocks'
-        for b in blocks:
-            b[0] = None
-        if not want32:
-            return None, None, f'not built: {why64}; FP64 XC as stock'
+    if got != nvals or p1 != ngrids:
+        # the prediction disagrees with block_loop: keep nothing rather than guess
+        blocks = None
+        _release_pool()
+        return None, None, (f'not built: block_loop produced {got} values over {p1} grid '
+                            f'points, predicted {nvals} over {ngrids}')
     tier = {(True, True): 'fp64+fp32', (False, True): 'fp32', (True, False): 'fp64'}[
         (keep64, want32)]
     cache = _AOCache(blocks, keep64, want32, opt, grids.coords, ao_deriv, n_empty)
     cache.nvals = nvals
-    gib64 = nvals * 8 * keep64 / 2**30
-    gib32 = nvals * 4 * want32 / 2**30
-    note = f'built: {gib64 + gib32:.2f} GiB, tier {tier}'
+    gib = nvals * (8 * keep64 + 4 * want32) / 2**30
+    note = f'built: {gib:.2f} GiB, tier {tier}'
     if want64 and not keep64:
         note += f' (no FP64 copy: {why64})'
     return cache, tier, note
+
+
+def _nr_rks_overridden(ni):
+    from gpu4pyscf.dft import numint
+    return (getattr(type(ni), 'nr_rks', None) is not numint.nr_rks
+            or 'nr_rks' in vars(ni))
 
 
 def _ensure_ao_cache(state, ni, opt, grids, ao_deriv, want32):
@@ -593,7 +649,7 @@ def _ensure_ao_cache(state, ni, opt, grids, ao_deriv, want32):
     if state.ao_cache_tried:
         return state.ao_cache
     state.ao_cache_tried = True
-    want64 = state.policy.ao_cache_fp64
+    want64 = state.policy.ao_cache_fp64 and not _nr_rks_overridden(ni)
     if not (want64 or want32):
         return None
     budget = state.policy.ao_cache_mem_fraction * _free_device_bytes()
@@ -775,7 +831,7 @@ def nr_rks_fp64_cached(state, ni, mol, grids, xc_code, dms):
     from gpu4pyscf.dft import numint
     if not state.policy.ao_cache_fp64:
         return None
-    if getattr(type(ni), 'nr_rks', None) is not numint.nr_rks:
+    if _nr_rks_overridden(ni):
         if not state.ao_cache_tried:
             state.ao_cache_tried = True
             state.ao_cache_note = f'not built: {type(ni).__name__} overrides nr_rks'
