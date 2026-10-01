@@ -163,13 +163,21 @@ stock statements run unchanged; positional callers are untouched.
 | `gpu4pyscf/dft/mixed_precision.py` | `vv10` policy field and `vv10_switch_tol`, component-scoped `check_supported`, the VV10 controller, launcher selection, record keys, the certificate in `end()` |
 | `gpu4pyscf/df/df_jk.py`, `gpu4pyscf/dft/rks.py` | `get_veff` passes the selected launcher to `nr_nlc_vxc` and reports E_nlc to the policy |
 | `gpu4pyscf/scf/hf.py` | `scf()` certifies on success and skips the certificate when the SCF raised |
-| `gpu4pyscf/dft/tests/test_mixed_precision_vv10.py` (new) | 16 tests |
+| `gpu4pyscf/dft/tests/test_mixed_precision_vv10.py` (new) | 18 tests |
 
-**Testing.** `test_mixed_precision_vv10.py` (16 tests): the kernel bind; each kernel against stock
+**Testing.** `test_mixed_precision_vv10.py` (18 tests): the kernel bind; each kernel against stock
 `_vv10nlc` per point on a converged paracetamol density (the FP64 reference bit-identical, FP32
 and df64 within their bands, `uwe_kernel=None` bit-identical to `uwe_stock`); wB97M-V SCF mixed vs
 stock on water and paracetamol with DF and on water without (|ΔE| ≤ 1e-8 Ha, cycles ±1, df64 tail,
 certificate in band on the last call); the convergence guard; a perturbed df64 result that must
 fail the certificate; an SCF that raises; each refusal; and the default policy as stock. The 21
-existing tests in `test_mixed_precision.py` are unchanged. GPU validation of the port on the 1.8.1
-wheel is pending.
+existing tests in `test_mixed_precision.py` are unchanged.
+
+**GPU validation: PASS** on one RTX PRO 6000 at `906043fd`
+(`benchmarks/mixed_precision/validation/VALIDATION-vv10.md`):
+- the base files are byte-identical to the 1.8.1 wheel;
+- both kernels are bitwise identical on the GPU to their NumPy emulations;
+- the upstream regression tests pass 42/42 before and after the overlay;
+- the new tests pass 39/39;
+- wB97M-V on paracetamol, propranolol and celecoxib: |ΔE| ≤ 9.1e-13 Ha, identical cycles, a df64 tail
+  with no stock tail call, and the certificate ≤ 1.8e-13 relative.
