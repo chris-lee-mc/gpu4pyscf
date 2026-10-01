@@ -102,8 +102,8 @@ wB97M-V / def2-mTZVPP, DF, nlcgrids at the library default). Whole-SCF e2e is th
   vs 5.12 s); the df64 kernel 5.32× (0.959 s vs 5.10 s). Kernel error against stock: FP32 ≤ 1.16e-7
   relative and 1.17e-10 Ha in E_nlc; df64 ≤ 2.3e-13 and 1.3e-14 Ha.
 - **Not measured:** other cards, other functionals or nlcgrids, gradients, open shell, molecules
-  beyond these three. These numbers are the prototype's; the port's own GPU validation is a
-  correctness gate (to be added under `validation/`).
+  beyond these three. These numbers are the prototype's. The port's own GPU validation is a
+  correctness gate, and passed: see `validation/VALIDATION-vv10.md`.
 
 ## Contents
 
