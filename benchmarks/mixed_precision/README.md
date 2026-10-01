@@ -30,19 +30,80 @@ print(mf.mixed_precision_record)   # the precision of each iteration, and why it
     the potential-matrix accumulator stay FP64.
   - K, for global hybrids with density fitting only: the two exchange contractions. J and the K
     accumulator stay FP64.
-- **Accuracy contract.** Each component switches one way, FP32 → FP64. The switch comes from an
-  XC-energy-change threshold, a stall detector or an iteration cap. The SCF cannot report
-  convergence until two consecutive iterations were built entirely in FP64; if the convergence
-  tests pass earlier, the switch is forced and the SCF continues.
+- **Accuracy contract.** Each component switches one way, FP32 → FP64 (→ df64 for VV10, below).
+  The switch comes from an energy-change threshold, a stall detector or an iteration cap. The SCF
+  cannot report convergence until two consecutive iterations were built without FP32-phase
+  arithmetic; if the convergence tests pass earlier, the switch is forced and the SCF continues.
 - **Refused with `NotImplementedError` at `kernel()`, never silently ignored:**
-  - UKS / ROKS / GKS, and RKS with spin ≠ 0;
-  - range-separated functionals;
-  - NLC (e.g. VV10);
-  - multi-GPU;
-  - `k=True` without density fitting.
+  - UKS / ROKS / GKS, and RKS with spin ≠ 0 (every component);
+  - multi-GPU (every component);
+  - with `xc=True` or `k=True`: range-separated functionals, and NLC functionals (use
+    `vv10=True` alone for those);
+  - `k=True` without density fitting;
+  - with `vv10=True`: a functional with no NLC term, more than one VV10 term, or VV10
+    coefficients outside b > 0 / finite, or a custom `NumInt` whose `nr_nlc_vxc` does not
+    accept the `vv10_kernel` keyword.
+
+  A VV10 kernel that does not build or fails its forced probe raises `RuntimeError` at the start
+  of the SCF.
 - **Memory.** The AO cache is capped at a fraction of free GPU memory (`ao_cache_mem_fraction`,
   default 0.7). If it does not fit, XC stays FP64 for that SCF, K follows it (K is never FP32 while XC is FP64), and the record says why.
 - **Not covered.** Gradients and Hessians are unchanged: they run stock, in FP64.
+
+## VV10
+
+`MixedPrecision(vv10=True)` treats the VV10 nonlocal-correlation pair sum of `numint._vv10nlc`
+(the O(N²) U/W/E kernel over the masked nlc grid). It is a separate component, for functionals
+with exactly one VV10 term such as wB97M-V, and runs **alone**: `xc=True` / `k=True` still refuse
+NLC functionals. Range-separated functionals and the non-DF path are allowed for it.
+
+```python
+mf = gpu4pyscf.dft.RKS(mol, xc='wb97m-v').density_fit()
+mf.mixed_precision = MixedPrecision(vv10=True)
+mf.kernel()
+rec = mf.mixed_precision_record
+rec['vv10']        # per call: 'fp32' ... then 'df64' ...
+rec['vv10_cert']   # the stock FP64 certificate on the last call
+```
+
+- **Phases.** Early calls run the pair sum with FP32 pair terms and FP64 accumulation (variant
+  `f32_t1_hilo`, hi/lo-split coordinates). The switch is one way, on |ΔE_nlc| between calls below
+  `vv10_switch_tol` (default 1e-5 Ha), with the same stall detector and cap. After it, **every**
+  call runs a df64 kernel (`df64_f32_t1`: FP32-pair double-float arithmetic, ~48-bit). There are
+  no stock FP64 tail calls. Everything outside the pair sum (density on the grid, masking, the
+  potential matrix) is stock FP64.
+- **Certificate.** When the SCF ends, the stock FP64 kernel re-runs on the inputs of the last
+  df64 call, inside the SCF timer. The bands are 1e-10 relative on E/U/W and 1e-11 Ha on E_nlc.
+  Out of band (or if certifying itself fails), the record is stored, `mf.converged` is set to
+  False and `RuntimeError` is raised. A run that ends in the FP32 phase has no certificate
+  (`vv10_cert` is None). An SCF that raises skips it.
+- **The guard.** The two-iteration rule above treats a df64 VV10 call as clean and an FP32 one as
+  not, so convergence is accepted only on a df64 (or, with the component off, stock) tail.
+- **Record.** `vv10`, `vv10_n_masked`, `vv10_switch_call`, `vv10_switch_reason`, `vv10_n_fp32`,
+  `vv10_n_df64`, `vv10_tol`, `vv10_kernel` (variant, entry and build status of both kernels),
+  `vv10_cert` and `tail_precision`.
+- **Seam.** `numint._vv10nlc` and `numint.nr_nlc_vxc` gain the keywords `uwe_kernel=` /
+  `vv10_kernel=`, default None (the stock kernel). With None the stock code path is unchanged.
+
+**Measured** (external prototype, `data/vv10_wb97mv_pro6000.csv`; RTX PRO 6000 Blackwell,
+wB97M-V / def2-mTZVPP, DF, nlcgrids at the library default). Whole-SCF e2e is the stock FP64 wall
+÷ the treated wall on the same pod, certificate included:
+
+| stage | run | paracetamol | propranolol | celecoxib | worst \|ΔE\| (Ha) |
+|---|---|---|---|---|---|
+| FP32 + stock tail, tol 1e-4 | 36781246916 | 1.555 | 1.393 | 1.363 | 9.1e-13 |
+| FP32 + stock tail, tol 1e-5 | 36792813279 | 1.690 | 1.649 | 1.592 | 4.5e-13 |
+| **FP32 + df64 tail + certificate (ADOPTed)** | **36875554583** | **2.809** | **2.965** | **2.635** | **9.1e-13** |
+
+- ADOPTed run: celecoxib 92.16 s → 34.98 s, of which the certificate is 5.07 s; cycle counts
+  identical to stock on all three; certificates 7.8e-14 / 1.6e-13 / 1.5e-13 relative. Against
+  stock GPU4PySCF's own warm wall, the geomean is 2.798.
+- Kernel level, celecoxib: the FP32 pair sum is 30.4× faster than the stock UWE kernel (0.168 s
+  vs 5.12 s); the df64 kernel 5.32× (0.959 s vs 5.10 s). Kernel error against stock: FP32 ≤ 1.16e-7
+  relative and 1.17e-10 Ha in E_nlc; df64 ≤ 2.3e-13 and 1.3e-14 Ha.
+- **Not measured:** other cards, other functionals or nlcgrids, gradients, open shell, molecules
+  beyond these three. These numbers are the prototype's; the port's own GPU validation is a
+  correctness gate (to be added under `validation/`).
 
 ## Contents
 
@@ -53,6 +114,7 @@ print(mf.mixed_precision_record)   # the precision of each iteration, and why it
 | `data/b3lyp_cutensor_aba_pro6000.csv` | B3LYP, L tier, one pod, einsum → cuTENSOR → einsum legs (3 × 4 rows). |
 | `data/r2scan_gradient_xc.csv` | Analytic-gradient XC experiment on RTX PRO 6000 and A100. Exploratory; not part of the proposal. |
 | `data/r2scan_energy_trio_by_gpu.csv` | Three molecules on RTX PRO 6000, H100 and A100, energy path. |
+| `data/vv10_wb97mv_pro6000.csv` | wB97M-V VV10, three molecules × six runs, RTX PRO 6000: two kernel commissionings (FP32, df64) and four whole-SCF runs (FP32 + stock tail at tol 1e-4 and 1e-5; df64 tail, shadowed and production). |
 | `data/SOURCES.md` | Per table: the CI run, its attempt and commit, and the GPU string, pins and settings as recorded by that run. |
 | `verify_aggregates.py` | Recomputes each quoted geomean, range, ratio and bound, and checks it against the quoted value. |
 | `geometries/*.xyz` + `SHA256SUMS` | The 24 fixed input geometries (RDKit ETKDGv3 + MMFF, conformer 0; the recipe is in each file's comment line). |
@@ -68,6 +130,10 @@ print(mf.mixed_precision_record)   # the precision of each iteration, and why it
 - **Incremental K ratio** is XC-only wall ÷ XC+K wall. It includes any change in cycle count.
 - The r2SCAN (`conv_tol_grad=1e-5`) and B3LYP (library default) tables use different SCF
   convergence settings, and should not be pooled.
+- **VV10 e2e** is the spec side's own stock FP64 base arm ÷ treated, the ratio the VV10 RESULTs
+  quote; the CSV also carries the stock GPU4PySCF warm wall and that ratio. The commissioning rows'
+  walls are single runs with a shadow re-run inside the treated wall, and are not speed
+  measurements.
 - **H100 and A100 energy rows** were measured in a verification configuration: some stock re-runs
   are charged to the treated arm. The "net" columns subtract that recorded time, so they are
   reconstructions, not production measurements.
@@ -92,7 +158,9 @@ print(mf.mixed_precision_record)   # the precision of each iteration, and why it
 
 The numbers in `data/` were measured with an **external prototype** built on instance-level hooks,
 not with the code on this branch. The branch is a native port of the same scheme
-(`gpu4pyscf/dft/mixed_precision.py`, with hooks in `dft/rks.py`, `df/df_jk.py` and `scf/hf.py`).
+(`gpu4pyscf/dft/mixed_precision.py` and `gpu4pyscf/dft/vv10_mixed.py`, with hooks in `dft/rks.py`,
+`df/df_jk.py`, `dft/numint.py` and `scf/hf.py`). The VV10 kernel sources are byte-identical to the
+prototype's.
 Its own GPU validation is in `validation/`. That validation is a correctness gate, not a speed
 measurement: re-measuring speed with the port is future work.
 

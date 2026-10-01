@@ -76,7 +76,7 @@ The following features are still in the experimental stage
 - QM/MM with PBC;
 - Multi-GPU for both direct SCF and density fitting;
 - SCF and DFT with periodic boundary condition;
-- Opt-in mixed-precision SCF for closed-shell RKS on GPUs with limited FP64 throughput (`mf.mixed_precision`, see [benchmarks/mixed_precision](benchmarks/mixed_precision));
+- Opt-in mixed-precision SCF for closed-shell RKS on GPUs with limited FP64 throughput: XC quadrature, DF exchange and the VV10 nonlocal term (`mf.mixed_precision`, see [benchmarks/mixed_precision](benchmarks/mixed_precision));
 - Non-adiabatic coupling for TDDFT;
 - Energy decomposition analysis;
 

@@ -42,7 +42,9 @@ aggregate.
 | `benchmarks/mixed_precision/` (new) | Evidence bundle, usage notes, GPU validation record |
 | `README.md` | One line under experimental features |
 
-The code diff is +914 / −18 across five files, including the tests.
+For the XC and K components alone (v1.8.1 to `mixed-precision-scf-v1.8.1`), the code diff is
++914 / −18 across the five `gpu4pyscf/` files above, including the tests. The VV10 component (below) adds
+two files and touches `numint.py`; it is not in that count.
 
 ## Design points for review
 
@@ -50,10 +52,10 @@ The code diff is +914 / −18 across five files, including the tests.
   RI-MP2 and TDDFT-RIS. Nothing is enabled by GPU model.
 - **Refusals are loud.** Each of these raises `NotImplementedError` at `kernel()`:
   - UKS / ROKS / GKS, and spin ≠ 0;
-  - range-separated functionals;
-  - NLC;
+  - with `xc=True` / `k=True`: range-separated functionals and NLC functionals;
   - multi-GPU;
-  - `k=True` without density fitting.
+  - `k=True` without density fitting;
+  - with `vv10=True` (separate component, below): no NLC term, or not exactly one VV10 term.
 - **What stays FP64.** Functional evaluation (`eval_xc_eff`), grid weights, the electron count,
   the XC energy, the Vxc accumulator, J, and the K accumulator. FP32 block results are promoted
   before accumulation.
@@ -97,10 +99,77 @@ The code diff is +914 / −18 across five files, including the tests.
 - **Speed numbers.** The published ones come from the prototype, not from this implementation.
   This PR's own validation is a correctness gate; a like-for-like speed re-measurement with this
   code is still to do.
-- **Scope.** The analytic gradient, the Hessian, UKS, range-separated and NLC functionals are all
-  out of scope.
+- **Scope.** The analytic gradient, the Hessian and UKS are out of scope. Range-separated and NLC
+  functionals are out of scope for `xc` / `k`; the VV10 component below is the only path that
+  treats an NLC functional.
 - **Base.** The branch is based on v1.8.1. A copy rebased onto current master exists, but has
   **not** been GPU-validated there. Master's compiled libraries differ from the 1.8.1 wheel, so
   the overlay method does not apply.
 - **For the maintainers:** whether the default switch thresholds and the `|ΔE| ≤ 1e-8 Ha` test
   tolerance are acceptable, and whether you prefer the policy object or a flag on `density_fit()`.
+
+## VV10 component (`MixedPrecision(vv10=True)`)
+
+**Scope note.** The upstream RFC (`DISCUSSION-DRAFT-precision-option.md`) lists NLC among the
+initial exclusions, so this component is outside what it proposes. It would be proposed separately,
+or as a follow-up once the XC/K mode is settled; it is on this branch so that it can be reviewed
+and validated against the same 1.8.1 base. It is independent of `xc` / `k`: those still refuse
+NLC functionals, and `vv10=True` runs alone.
+
+**What it does.** It treats only the VV10 pair sum of `numint._vv10nlc` (the O(N²) U/W/E kernel on
+the masked nlc grid), for functionals with exactly one VV10 term such as wB97M-V.
+- Early calls run FP32 pair terms with FP64 accumulation and hi/lo-split coordinates
+  (`f32_t1_hilo`).
+- A one-way switch on |ΔE_nlc| < 1e-5 Ha (with the same stall detector and cap) moves every later
+  call to a df64 kernel (`df64_f32_t1`: double-float arithmetic on FP32 pairs, ~48-bit). There is
+  no stock FP64 tail call.
+- When the SCF ends, a stock FP64 **certificate** re-runs the stock kernel on the last df64 call's
+  inputs, inside the SCF timer. Bands: 1e-10 relative on E/U/W, 1e-11 Ha on E_nlc. Out of band,
+  `mf.converged` is set to False and `RuntimeError` is raised. An SCF that raised skips it.
+- The convergence guard counts a df64 VV10 call as clean and an FP32 one as not: convergence is
+  accepted only after two consecutive iterations built without FP32-phase arithmetic.
+- Range-separated functionals (wB97M-V is one) and the non-DF path are allowed for this component.
+- A kernel that fails to build or fails its forced probe raises `RuntimeError`; there is no
+  fallback.
+
+**New keywords in `numint`.** `_vv10nlc(..., uwe_kernel=None)` and
+`nr_nlc_vxc(..., vv10_kernel=None)`, which passes it on as `uwe_kernel`. With the default None the
+stock statements run unchanged; positional callers are untouched.
+
+**Measured** with the external prototype, wB97M-V / def2-mTZVPP, DF, RTX PRO 6000 Blackwell (run
+`36875554583`; data in `benchmarks/mixed_precision/data/vv10_wb97mv_pro6000.csv`):
+
+| molecule | stock FP64 → treated wall (s) | e2e | \|ΔE\| (Ha) | cycles | certificate rel / wall |
+|---|---|---|---|---|---|
+| paracetamol | 19.14 → 6.81 | 2.809 | 2.3e-13 | 12 / 12 | 7.8e-14 / 1.17 s |
+| propranolol | 75.73 → 25.54 | 2.965 | 9.1e-13 | 13 / 13 | 1.6e-13 / 4.47 s |
+| celecoxib | 92.16 → 34.98 | **2.635** | 4.5e-13 | 13 / 13 | 1.5e-13 / 5.07 s |
+
+- 7 FP32 calls, then 6–7 df64 calls, on every molecule. Against stock GPU4PySCF's warm wall the
+  geomean is 2.798.
+- Kernel level (celecoxib): FP32 30.4× and df64 5.32× faster than the stock UWE kernel; error
+  against stock ≤ 1.16e-7 relative (FP32) and ≤ 2.3e-13 (df64).
+- Before the df64 tail, the same FP32 phase with a stock FP64 tail gave 1.363× (tol 1e-4) and
+  1.592× (tol 1e-5) on celecoxib.
+- Not measured: other cards, functionals or nlcgrids, gradients, open shell. The port's own GPU
+  validation is a correctness gate, not a speed re-measurement.
+
+**Files.**
+
+| file | change |
+|---|---|
+| `gpu4pyscf/dft/vv10_mixed.py` (new) | FP32 and df64 VV10 kernel sources (NVRTC, cupy imported lazily), bind with forced probes once per device, `uwe_stock`, `certify` |
+| `gpu4pyscf/dft/numint.py` | the `uwe_kernel=` / `vv10_kernel=` keywords |
+| `gpu4pyscf/dft/mixed_precision.py` | `vv10` policy field and `vv10_switch_tol`, component-scoped `check_supported`, the VV10 controller, launcher selection, record keys, the certificate in `end()` |
+| `gpu4pyscf/df/df_jk.py`, `gpu4pyscf/dft/rks.py` | `get_veff` passes the selected launcher to `nr_nlc_vxc` and reports E_nlc to the policy |
+| `gpu4pyscf/scf/hf.py` | `scf()` certifies on success and skips the certificate when the SCF raised |
+| `gpu4pyscf/dft/tests/test_mixed_precision_vv10.py` (new) | 16 tests |
+
+**Testing.** `test_mixed_precision_vv10.py` (16 tests): the kernel bind; each kernel against stock
+`_vv10nlc` per point on a converged paracetamol density (the FP64 reference bit-identical, FP32
+and df64 within their bands, `uwe_kernel=None` bit-identical to `uwe_stock`); wB97M-V SCF mixed vs
+stock on water and paracetamol with DF and on water without (|ΔE| ≤ 1e-8 Ha, cycles ±1, df64 tail,
+certificate in band on the last call); the convergence guard; a perturbed df64 result that must
+fail the certificate; an SCF that raises; each refusal; and the default policy as stock. The 21
+existing tests in `test_mixed_precision.py` are unchanged. GPU validation of the port on the 1.8.1
+wheel is pending.
