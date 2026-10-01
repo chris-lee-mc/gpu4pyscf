@@ -8,8 +8,8 @@ for fixed notation, significant figures for scientific notation). Bounds printed
 also if a CSV is missing or a check finds no rows (fail closed: an empty selection is
 never a pass).
 
-The CSVs were extracted from SCFBENCH_JSON / ABA_JSON_* / GRADMP_JSON lines of the
-sentinels listed in data/SOURCES.md.
+The CSVs were extracted from SCFBENCH_JSON / ABA_JSON_* / GRADMP_JSON / VV10COMM_JSON /
+VV10DF64COMM_JSON lines of the sentinels listed in data/SOURCES.md.
 """
 import csv
 import math
@@ -313,8 +313,163 @@ def trio():
              geomean(num(p[m]["e2e_g4p_over_spec"]) for m in mols), "1.697")
 
 
+# ---------------------------------------------------------------- 6. VV10 wB97M-V
+def vv10():
+    src = "6 VV10 wB97M-V"
+    rows = load("vv10_wb97mv_pro6000.csv")
+    mols = ["paracetamol", "propranolol", "celecoxib"]
+    stages = {"36769392379": "fp32_commission", "36781246916": "fp32_stock_tail_tol1e-4",
+              "36792813279": "fp32_stock_tail_tol1e-5", "36869739118": "df64_commission",
+              "36873230133": "df64_tail_shadowed", "36875554583": "df64_tail_production"}
+    for run, stage in stages.items():
+        rs = sel(rows, run_id=run, stage=stage)
+        check_exact(src, "%s coverage" % stage, sorted(r["molecule"] for r in rs), sorted(mols))
+    check_exact(src, "total rows", len(rows), 18)
+
+    def cert_rel(r):
+        return max(num(r["cert_rel_E"]), num(r["cert_rel_U"]), num(r["cert_rel_W"]))
+
+    # PREREG-vv10-commission.md RESULT: FP32 matrix (selected f32_t1_hilo) and treated SCF
+    C = by_mol(sel(rows, run_id="36769392379"))
+    check_exact(src, "fp32 commission matrix variant",
+                sorted(set(r["matrix_variant"] for r in C.values())), ["f32_t1_hilo"])
+    check_eq(src, "fp32 max rel (worst molecule)", max(num(r["matrix_max_rel"]) for r in C.values()), "1.16e-7")
+    check_eq(src, "fp32 max |dE_nlc| Ha", max(num(r["matrix_max_abs_dEnlc_Ha"]) for r in C.values()), "1.17e-10")
+    c = C["celecoxib"]
+    check_eq(src, "fp32 celecoxib kernel median s", num(c["matrix_kernel_median_s"]), "0.168")
+    check_eq(src, "fp32 celecoxib stock/FP32",
+             num(c["matrix_stock_uwe_median_s"]) / num(c["matrix_kernel_median_s"]), "30.4")
+    for mol, b in zip(mols, ["1.18", "4.51", "5.12"]):
+        check_eq(src, "stock UWE per call %s s" % mol, num(C[mol]["matrix_stock_uwe_median_s"]), b)
+    for mol, ws, wt, de, cyc, nf, sw in [
+            ("paracetamol", "19.20", "13.81", "4.5e-13", (12, 12), 6, 7),
+            ("propranolol", "76.52", "59.33", "0.0", (13, 13), 5, 6),
+            ("celecoxib", "93.00", "73.52", "4.5e-13", (13, 13), 5, 6)]:
+        r = C[mol]
+        check_eq(src, "fp32 commission %s wall stock s" % mol, num(r["wall_base_s"]), ws)
+        check_eq(src, "fp32 commission %s wall treated s" % mol, num(r["wall_spec_s"]), wt)
+        check_eq(src, "fp32 commission %s |dE|" % mol, num(r["abs_dE_spec_vs_base_Ha"]), de)
+        check_exact(src, "fp32 commission %s cycles" % mol,
+                    (int(r["n_cycle_spec"]), int(r["n_cycle_base"])), cyc)
+        check_exact(src, "fp32 commission %s FP32 calls / switch" % mol,
+                    (int(r["n_fp32"]), int(r["switch_call"])), (nf, sw))
+
+    # PREREG-vv10-production.md RESULT (R2) and PREREG-vv10-tol5.md RESULT: FP32 + stock tail
+    for run, label, tol, gm, per, tab in [
+            ("36781246916", "tol 1e-4", "0.0001", "1.433", ["1.550", "1.393", "1.363"],
+             [("paracetamol", (6, 7, 7), "16.11", "9.33", "1.727", "18.95", "12.18", "1.555", "1.552", "0.0", (12, 12)),
+              ("propranolol", (5, 9, 6), "65.11", "43.80", "1.486", "75.50", "54.19", "1.393", "1.399", "0.0", (13, 13)),
+              ("celecoxib", (5, 9, 6), "74.64", "50.17", "1.488", "91.81", "67.35", "1.363", "1.363", "9.1e-13", (13, 13))]),
+            ("36792813279", "tol 1e-5", "1e-05", "1.643", ["1.690", "1.647", "1.595"],
+             [("paracetamol", (7, 6, 8), "16.17", "8.30", "1.949", "19.17", "11.35", "1.690", "1.698", "2.3e-13", (12, 12)),
+              ("propranolol", (7, 7, 8), "65.30", "35.39", "1.845", "75.86", "45.99", "1.649", "1.663", "4.5e-13", (13, 13)),
+              ("celecoxib", (7, 7, 8), "74.85", "40.56", "1.845", "92.27", "57.95", "1.592", "1.589", "4.5e-13", (13, 13))])]:
+        rs = sel(rows, run_id=run)
+        check_exact(src, "%s tol / tail / variant / shadowed" % label,
+                    sorted(set((r["tol"], r["tail"], r["fp32_variant"], r["shadowed"]) for r in rs)),
+                    [(tol, "stock", "f32_t1_hilo", "no")])
+        _vv10_scf_table(src, label, by_mol(rs), tab)
+        m = by_mol(rs)
+        sp = {x: num(m[x]["g4p_wall_warm_s"]) / num(m[x]["wall_spec_s"]) for x in mols}
+        check_eq(src, "%s spec.speedup geomean (g4p/spec)" % label, geomean(sp.values()), gm)
+        for mol, b in zip(mols, per):
+            check_eq(src, "%s spec.speedup %s" % (label, mol), sp[mol], b)
+
+    # PREREG-vv10-df64-commission.md RESULT: df64 matrix and treated SCF with certificate
+    D = by_mol(sel(rows, run_id="36869739118"))
+    check_exact(src, "df64 commission matrix variant",
+                sorted(set(r["matrix_variant"] for r in D.values())), ["df64_f32_t1"])
+    for mol, rel, dn in [("paracetamol", "8.5e-14", "2.1e-15"), ("propranolol", "1.8e-13", "1.1e-14"),
+                         ("celecoxib", "2.3e-13", "1.3e-14")]:
+        check_eq(src, "df64 %s max rel" % mol, num(D[mol]["matrix_max_rel"]), rel)
+        check_eq(src, "df64 %s max |dE_nlc| Ha" % mol, num(D[mol]["matrix_max_abs_dEnlc_Ha"]), dn)
+    d = D["celecoxib"]
+    check_eq(src, "df64 celecoxib kernel median s", num(d["matrix_kernel_median_s"]), "0.959")
+    check_eq(src, "df64 celecoxib kernel median s (Amendment 1 k)", num(d["matrix_kernel_median_s"]), "0.9594")
+    check_eq(src, "df64 celecoxib stock/df64 (P2)",
+             num(d["matrix_stock_uwe_median_s"]) / num(d["matrix_kernel_median_s"]), "5.32")
+    check_eq(src, "df64 celecoxib cert wall s (Amendment 1 c)", num(d["cert_wall_s"]), "5.084")
+    for mol, rel, dn, w, nf, nt in [("paracetamol", "7.7e-14", "2.0e-15", "1.17", 7, 6),
+                                    ("propranolol", "1.6e-13", "1.1e-14", "4.48", 7, 7),
+                                    ("celecoxib", "1.5e-13", "1.2e-14", "5.08", 7, 7)]:
+        r = D[mol]
+        check_exact(src, "df64 commission %s FP32/df64 calls, switch, tail" % mol,
+                    (int(r["n_fp32"]), int(r["n_tail"]), int(r["switch_call"]), r["tail"]), (nf, nt, 8, "df64"))
+        check_eq(src, "df64 commission %s |dE|" % mol, num(r["abs_dE_spec_vs_base_Ha"]), "4.5e-13")
+        check_exact(src, "df64 commission %s cycles" % mol,
+                    int(r["n_cycle_spec"]), int(r["n_cycle_base"]))
+        check_eq(src, "df64 commission %s cert rel" % mol, cert_rel(r), rel)
+        check_eq(src, "df64 commission %s cert |dE_nlc|" % mol, num(r["cert_denlc_Ha"]), dn)
+        check_eq(src, "df64 commission %s cert wall s" % mol, num(r["cert_wall_s"]), w)
+
+    # PREREG-vv10-df64-production.md RESULT: R1 (shadowed, disclosed) and R2 (ADOPT)
+    R1 = by_mol(sel(rows, run_id="36873230133"))
+    check_exact(src, "df64 R1 shadowed", sorted(set(r["shadowed"] for r in R1.values())), ["yes"])
+    for mol, rel in zip(mols, ["7.7e-14", "1.6e-13", "1.5e-13"]):
+        check_eq(src, "df64 R1 %s cert rel" % mol, cert_rel(R1[mol]), rel)
+    c = R1["celecoxib"]
+    check_eq(src, "df64 R1 celecoxib e2e (shadowed, disclosed)",
+             num(c["wall_base_s"]) / num(c["wall_spec_s"]), "1.225")
+    rs = sel(rows, run_id="36875554583")
+    P = by_mol(rs)
+    check_exact(src, "df64 R2 tol / tail / variant / shadowed",
+                sorted(set((r["tol"], r["tail"], r["fp32_variant"], r["shadowed"]) for r in rs)),
+                [("1e-05", "df64", "f32_t1_hilo", "no")])
+    _vv10_scf_table(src, "df64 R2", P, [
+        ("paracetamol", (7, 6, 8), "16.14", "2.63", "6.14", "19.14", "6.81", "2.809", "2.835", "2.3e-13", (12, 12)),
+        ("propranolol", (7, 7, 8), "65.08", "10.37", "6.27", "75.73", "25.54", "2.965", "2.974", "9.1e-13", (13, 13)),
+        ("celecoxib", (7, 7, 8), "74.61", "12.41", "6.01", "92.16", "34.98", "2.635", "2.636", "4.5e-13", (13, 13))])
+    for mol, rel, w in [("paracetamol", "7.8e-14", "1.17"), ("propranolol", "1.6e-13", "4.47"),
+                        ("celecoxib", "1.5e-13", "5.07")]:
+        r = P[mol]
+        check_eq(src, "df64 R2 %s cert rel" % mol, cert_rel(r), rel)
+        check_eq(src, "df64 R2 %s cert wall s" % mol, num(r["cert_wall_s"]), w)
+        check_exact(src, "df64 R2 %s cert on the last call" % mol,
+                    int(r["cert_call"]), int(r["n_fp32"]) + int(r["n_tail"]))
+        check_le(src, "df64 R2 %s cert rel in VVDF_REL band" % mol, cert_rel(r), "1e-10")
+        check_le(src, "df64 R2 %s cert |dE_nlc| in VVDF_DENLC band" % mol, num(r["cert_denlc_Ha"]), "1e-11")
+    check_le(src, "df64 R2 max |dE|", max(num(r["abs_dE_spec_vs_base_Ha"]) for r in rs), "9.1e-13")
+    sp = {m: num(P[m]["g4p_wall_warm_s"]) / num(P[m]["wall_spec_s"]) for m in mols}
+    check_eq(src, "df64 R2 spec.speedup geomean (g4p/spec)", geomean(sp.values()), "2.798")
+    for mol, b in zip(mols, ["2.801", "2.971", "2.633"]):
+        check_eq(src, "df64 R2 spec.speedup %s" % mol, sp[mol], b)
+    c = P["celecoxib"]
+    check_eq(src, "df64 R2 celecoxib cert share of wall s", num(c["cert_wall_s"]), "5.1")
+    check_eq(src, "df64 R2 celecoxib wall net of cert s", num(c["wall_spec_s"]) - num(c["cert_wall_s"]), "29.9")
+    check_eq(src, "df64 R2 celecoxib e2e net of cert",
+             num(c["wall_base_s"]) / (num(c["wall_spec_s"]) - num(c["cert_wall_s"])), "3.08")
+    # the stage table (celecoxib, same inputs)
+    for run, w, e in [("36781246916", "67.35", "1.363"), ("36792813279", "57.95", "1.592"),
+                      ("36875554583", "34.98", "2.635")]:
+        r = sel(rows, run_id=run, molecule="celecoxib")[0]
+        check_eq(src, "stage table %s celecoxib treated wall s" % run, num(r["wall_spec_s"]), w)
+        check_eq(src, "stage table %s celecoxib e2e" % run, num(r["wall_base_s"]) / num(r["wall_spec_s"]), e)
+
+
+def _vv10_scf_table(src, label, m, tab):
+    """One per-molecule scfbench RESULT table: calls, nlc, mechanism, walls, e2e, |dE|, cycles."""
+    for mol, calls, nb, ns, mech, wb, ws, e2e, proj, de, cyc in tab:
+        r = m[mol]
+        check_exact(src, "%s %s FP32/tail calls, switch call" % (label, mol),
+                    (int(r["n_fp32"]), int(r["n_tail"]), int(r["switch_call"])), calls)
+        check_exact(src, "%s %s switch kind" % (label, mol), r["switch_kind"], "dexc")
+        check_eq(src, "%s %s nlc base s" % (label, mol), num(r["nlc_base_s"]), nb)
+        check_eq(src, "%s %s nlc spec s" % (label, mol), num(r["nlc_spec_s"]), ns)
+        check_eq(src, "%s %s mechanism (=nlc base/spec)" % (label, mol),
+                 num(r["nlc_base_s"]) / num(r["nlc_spec_s"]), mech)
+        check_eq(src, "%s %s wall base s" % (label, mol), num(r["wall_base_s"]), wb)
+        check_eq(src, "%s %s wall spec s" % (label, mol), num(r["wall_spec_s"]), ws)
+        check_eq(src, "%s %s e2e (=wall base/spec)" % (label, mol),
+                 num(r["wall_base_s"]) / num(r["wall_spec_s"]), e2e)
+        check_eq(src, "%s %s e2e as recorded" % (label, mol), num(r["e2e_base_over_spec"]), e2e)
+        check_eq(src, "%s %s projected" % (label, mol), num(r["e2e_projected"]), proj)
+        check_eq(src, "%s %s |dE|" % (label, mol), num(r["abs_dE_spec_vs_base_Ha"]), de)
+        check_exact(src, "%s %s cycles spec/base" % (label, mol),
+                    (int(r["n_cycle_spec"]), int(r["n_cycle_base"])), cyc)
+
+
 def main():
-    for fn in (ladder, cg, aba, grad, trio):
+    for fn in (ladder, cg, aba, grad, trio, vv10):
         try:
             fn()
         except Exception as e:  # a missing file or empty selection fails closed

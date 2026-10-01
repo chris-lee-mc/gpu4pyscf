@@ -325,7 +325,9 @@ def _kernel(mf, conv_tol=1e-10, conv_tol_grad=None,
                         'mixed_precision: this get_veff path does not report to '
                         'the mixed-precision policy; unset mf.mixed_precision')
                 # Mixed precision: convergence is accepted only after two
-                # consecutive iterations built entirely in FP64.
+                # consecutive iterations built without FP32-phase arithmetic;
+                # the VV10 tail is df64 and is certified against stock FP64
+                # after the SCF.
                 mp_state.force_fp64('convergence tests met before an FP64 tail')
                 log.info('mixed precision: switching to FP64 before accepting convergence')
                 continue
@@ -413,8 +415,15 @@ def scf(mf, dm0=None, **kwargs):
             mf.e_tot = _kernel(mf, mf.conv_tol, mf.conv_tol_grad,
                                 dm0=dm0, callback=mf.callback,
                                 conv_check=mf.conv_check, **kwargs)[1]
-    finally:
+    except BaseException:
         if mp_state is not None:
+            from gpu4pyscf.dft import mixed_precision
+            mixed_precision.end(mf, failed=True)
+        raise
+    else:
+        if mp_state is not None:
+            # Certifies the VV10 tail, inside the SCF timer; raises
+            # RuntimeError with mf.converged = False when out of band.
             from gpu4pyscf.dft import mixed_precision
             mixed_precision.end(mf)
 
