@@ -15,6 +15,13 @@ then open this PR only if they do, referencing that issue.
 >   `omega == 0` exchange build;
 > - `_block_loop` lost `strict_grid_order`, because it never skips blocks now.
 >
+> The opt-in FP64 AO cache (`ao_cache_fp64=True`) on this branch is likewise **not GPU-validated at master**.
+> It was validated on `mixed-precision-aocache-v1.8.1` at `63af056`
+> (`validation/VALIDATION-aocache.md` there). The commits apply unchanged: master's `nr_rks` and
+> `_nr_rks_task` are identical to v1.8.1's, so the cached FP64 path transcribes them as it does
+> there. Master's `_block_loop` yields empty blocks instead of skipping them; the cache still keeps
+> no FP64 copy for a grid with an empty block, which is conservative here.
+>
 > None of these changes has run on a GPU. Master's compiled libraries differ from the 1.8.1
 > wheel, so the overlay method used here does not apply; validating master needs a from-source
 > build.
