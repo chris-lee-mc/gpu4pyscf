@@ -362,7 +362,7 @@ class _DFHF:
                 k_prec = 'fp64'
                 res = None
                 if mp_state is not None:
-                    xc_prec, k_prec, _ = mp_state.begin_call()
+                    xc_prec, k_prec, _, _ = mp_state.begin_call()
                     if xc_prec == 'fp32':
                         from gpu4pyscf.dft import mixed_precision
                         res = mixed_precision.nr_rks_fp32(
@@ -373,6 +373,7 @@ class _DFHF:
                     res = ni.nr_rks(mol, self.grids, self.xc, dm)
                 n, exc, vxc = res
                 exc_xc = exc
+                enlc = None
                 log.debug('nelec by numeric integration = %s', n)
                 if self.do_nlc():
                     if ni.libxc.is_nlc(self.xc):
@@ -380,7 +381,12 @@ class _DFHF:
                     else:
                         assert ni.libxc.is_nlc(self.nlc)
                         xc = self.nlc
-                    n, enlc, vnlc = ni.nr_nlc_vxc(mol, self.nlcgrids, xc, dm)
+                    if mp_state is not None:
+                        n, enlc, vnlc = ni.nr_nlc_vxc(
+                            mol, self.nlcgrids, xc, dm,
+                            vv10_kernel=mp_state.vv10_kernel())
+                    else:
+                        n, enlc, vnlc = ni.nr_nlc_vxc(mol, self.nlcgrids, xc, dm)
                     exc += enlc
                     vxc += vnlc
                     log.debug('nelec with nlc grids = %s', n)
@@ -417,7 +423,7 @@ class _DFHF:
                     exc -= float(cupy.einsum('ij,ji->', dm, vk).real.get()) * .25
                 ecoul = float(cupy.einsum('ij,ji->', dm, vj).real.get()) * .5
                 if mp_state is not None:
-                    mp_state.end_call(exc_xc)
+                    mp_state.end_call(exc_xc, enlc)
             elif isinstance(self, ghf.GHF):
                 if hermi == 2:  # because rho = 0
                     n, exc, vxc = 0, 0, 0

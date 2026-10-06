@@ -97,8 +97,9 @@ def get_veff(ks, mol=None, dm=None, dm_last=None, vhf_last=None, hermi=1):
     mp_state = getattr(ks, '_mixed_precision_state', None)
     k_prec = 'fp64'
     full_rebuild = False
+    enlc = None
     if mp_state is not None:
-        xc_prec, k_prec, full_rebuild = mp_state.begin_call()
+        xc_prec, k_prec, full_rebuild, _ = mp_state.begin_call()
     if hermi == 2:  # because rho = 0
         n, exc, vxc = 0, 0, 0
     else:
@@ -118,7 +119,11 @@ def get_veff(ks, mol=None, dm=None, dm_last=None, vhf_last=None, hermi=1):
             else:
                 assert ni.libxc.is_nlc(ks.nlc)
                 xc = ks.nlc
-            n, enlc, vnlc = ni.nr_nlc_vxc(mol, ks.nlcgrids, xc, dm)
+            if mp_state is not None:
+                n, enlc, vnlc = ni.nr_nlc_vxc(mol, ks.nlcgrids, xc, dm,
+                                              vv10_kernel=mp_state.vv10_kernel())
+            else:
+                n, enlc, vnlc = ni.nr_nlc_vxc(mol, ks.nlcgrids, xc, dm)
 
             exc += enlc
             vxc += vnlc
@@ -162,7 +167,7 @@ def get_veff(ks, mol=None, dm=None, dm_last=None, vhf_last=None, hermi=1):
         vxc += vhf
     t0 = log.timer('veff', *t0)
     if mp_state is not None:
-        mp_state.end_call(exc_xc if hermi != 2 else 0.)
+        mp_state.end_call(exc_xc if hermi != 2 else 0., enlc)
     vxc = tag_array(vxc, ecoul=ecoul, exc=exc, vj=vhf)
     return vxc
 
