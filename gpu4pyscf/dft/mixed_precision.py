@@ -44,8 +44,9 @@ numint.nr_rks unchanged, and the record says which.
 
 Each component switches one way when the change in its energy (E_xc for XC
 and K, E_nlc for VV10) between successive iterations falls below its
-threshold. A stall detector and an iteration cap back that up. K is never
-FP32 on an iteration where XC is FP64.
+threshold. A stall detector and an iteration cap back that up. With xc and k
+both on, K is never FP32 on an iteration where XC is FP64 (K switches no later
+than XC); with k alone, K follows its own threshold.
 
 Convergence contract: convergence is accepted only after two consecutive
 iterations built without FP32-phase arithmetic; the VV10 tail is df64 and is
@@ -67,8 +68,11 @@ the non-DF path are allowed. Anything else
 raises NotImplementedError when the SCF starts; a VV10 kernel that does not
 build or fails its probe raises RuntimeError. Nothing falls back silently.
 
-This is an opt-in performance mode. On FP64-strong GPUs (e.g. H100, A100) it
-may not pay off.
+This is an opt-in performance mode for GPUs whose FP64 throughput is a small
+fraction of FP32. Do not enable it on FP64-strong GPUs: on an H100 and an A100
+it was measured 1.6-2x slower for wB97M-V, B3LYP ranged from neutral to
+about 1.1x slower on the H100, and 11 of 12 clean r2SCAN/B3LYP cells on the
+A100 were neutral or slower. Nothing here detects the device.
 
 Usage::
 
