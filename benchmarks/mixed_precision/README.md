@@ -26,10 +26,13 @@ print(mf.mixed_precision_record)   # the precision of each iteration, and why it
 ```
 
 - **Who it is for.** GPUs whose FP64 throughput is a small fraction of FP32, such as RTX and
-  workstation Blackwell cards. **On FP64-strong data-centre GPUs it harms B3LYP and wB97M-V**: the
-  FP32 switch alone measured 0.745 and 0.539 on an H100, and the A100's clean cells agree. Leave it
-  off there, or gate it on the device's FP64:FP32 ratio ([`native/CLAIMS.md`](native/CLAIMS.md)
-  C3). The FP64 AO cache alone still pays about 1.2× on those cards.
+  workstation Blackwell cards.
+- **Do not enable it on FP64-strong data-centre GPUs.** On the H100 and A100 tested, it made
+  wB97M-V about 2× slower and B3LYP up to 1.4× slower; r2SCAN was neutral
+  ([`native/CLAIMS.md`](native/CLAIMS.md) C3). The code does **not** detect this: nothing warns or
+  refuses on such a device. Only two levels of FP64:FP32 throughput were measured, so no threshold
+  is established. On those cards the FP64 AO cache alone (`MixedPrecision(ao_cache_fp64=True)`)
+  pays about 1.15–1.25× for r2SCAN and B3LYP, and is neutral for wB97M-V.
 - **Opt-in only.** It is off unless `mf.mixed_precision` is set. With it unset, nothing changes.
 - **What runs in FP32.**
   - XC: the density and XC-potential contractions, against an FP32 copy of the AO values that is
@@ -55,6 +58,15 @@ print(mf.mixed_precision_record)   # the precision of each iteration, and why it
   of the SCF.
 - **Memory.** The AO cache is capped at a fraction of free GPU memory (`ao_cache_mem_fraction`,
   default 0.7). If it does not fit, XC stays FP64 for that SCF, K follows it (K is never FP32 while XC is FP64), and the record says why.
+- **FP64 AO cache (opt-in, `ao_cache_fp64=True`, default `False`).**
+  - It also keeps an FP64 copy of the AO values, so the FP64 XC calls of the tail skip the AO
+    evaluation. The cached FP64 path is bitwise identical to stock `nr_rks`.
+  - Its tier is chosen from the predicted size before allocation: `fp64+fp32`, else `fp32` only,
+    else none. `mixed_precision_record['ao_cache_tier']` reports it.
+  - With a hybrid, the DF tensor is built first, so that DF places it as it would without the
+    cache.
+  - Every speed number in `native/` was measured **with** this cache on, with the other settings
+    listed in [`native/CLAIMS.md`](native/CLAIMS.md), which differ from the library defaults.
 - **Not covered.** Gradients and Hessians are unchanged: they run stock, in FP64.
 
 ## VV10
@@ -168,8 +180,10 @@ not with the code on this branch. The branch is a native port of the same scheme
 (`gpu4pyscf/dft/mixed_precision.py` and `gpu4pyscf/dft/vv10_mixed.py`, with hooks in `dft/rks.py`,
 `df/df_jk.py`, `dft/numint.py` and `scf/hf.py`). The VV10 kernel sources are byte-identical to the
 prototype's.
-Its own GPU validation is in `validation/`. That validation is a correctness gate, not a speed
-measurement: re-measuring speed with the port is future work.
+Its own GPU validation is in `validation/`, as a correctness gate. The port's speed is measured
+in [`native/`](native/README.md): 33 pods with the fork's own code. Those runs used an unpruned
+grid, the FP64 AO cache and B3LYP `xc_switch_tol=3e-4`, not the library defaults; the defaults
+themselves are not measured.
 
 The source-document paths in `data/SOURCES.md` refer to the authors' own lab notebook, which is
 not public. The CI run IDs and recorded settings next to them are the primary records.

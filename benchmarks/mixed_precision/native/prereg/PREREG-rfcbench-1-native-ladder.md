@@ -137,3 +137,9 @@ its sentinel and CSV are kept. The pair shows that one contended GPU lowers wB97
 - No tier falls below 1.3, so no falsifier is met.
 - The bridge leg is a MODEL-MISS (part 1).
 
+
+### Erratum (2026-10-06): found by the evidence-package review (`benchmarks/mixed_precision/native/` in the fork)
+
+The text above is left as written. These corrections supersede it where they differ; `verify_native.py` checks each corrected number against the data.
+
+- **Undisclosed flag.** L12's metformin B3LYP cell has a warm wall under 1 s (`under_1s`). It is retained; it was not mentioned above.

@@ -25,6 +25,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data")
+R = 3            # warm pairs per cell in every pod of the campaign (a bridge cell has pair 1 only)
 
 results = []  # (claim, check, recomputed, banked, ok)
 _cache = {}
@@ -33,11 +34,14 @@ _cache = {}
 # adjusted to pass: each is reported as DISCREPANCY with its reason, CLAIMS.md quotes the
 # recomputed value, and the script fails if one of them ever starts matching (so this list cannot
 # go stale silently).
+# Each entry: (claim, check) -> (the value the data gives at the printed precision, reason). A check
+# listed here passes as DISC only if it recomputes to exactly that value: any other value, and any
+# error, is a FAIL, so a listed number is still guarded.
 KNOWN_DISCREPANCIES = {
     ("N2", "L12 trio B3LYP (healthy PRO 6000 row)"):
-        "PREREG-2 part 2 printed 1.859; the value is 1.8595, which rounds to 1.860",
+        ("1.860", "PREREG-2 part 2 and PREREG-5 printed 1.859; the value is 1.8595"),
     ("N6", "MIG gain atorvastatin b3lyp stock"):
-        "PREREG-6 RESULT printed 1.09; the value is 1.0950, which rounds to 1.10",
+        ("1.10", "PREREG-6 RESULT printed 1.09 (twice); the value is 1.0950"),
 }
 
 
@@ -56,10 +60,17 @@ def walls(pods, key, arm):
     found = [p for p in pods if any(r["key"] == key for r in rows(p))]
     if len(found) != 1:
         raise LookupError(f"{key} found in {found} of {pods}")
-    rs = [r for r in rows(found[0]) if r["key"] == key and r["arm"] == arm and r["pair"] not in ("", "0")
-          and r["wall_s"] not in ("", None)]
+    rs = [r for r in rows(found[0]) if r["key"] == key and r["arm"] == arm and r["pair"] not in ("", "0")]
     if not rs:
         raise LookupError(f"no warm {arm} rows for {key} in {found[0]}")
+    want = {1} if key.startswith("bridge/") else set(range(1, R + 1))
+    pairs = sorted(int(r["pair"]) for r in rs)
+    if set(pairs) != want or len(pairs) != len(want):
+        raise ValueError(f"{found[0]} {key} {arm}: warm pairs {pairs}, expected {sorted(want)}")
+    for r in rs:
+        if r["error"] or r["converged"] != "True" or r["wall_s"] in ("", None):
+            raise ValueError(f"{found[0]} {key} {arm} pair {r['pair']}: error={r['error']!r} "
+                             f"converged={r['converged']!r}")
     return [float(r["wall_s"]) for r in rs]
 
 
@@ -158,7 +169,16 @@ def mig_gain(whole, inst, key, arm):
 
 
 TRIO = ("paracetamol", "propranolol", "celecoxib")
-W_HEALTHY = ("w1", "w2", "w3", "w4r", "w5")
+def pod(name):
+    hit = [r for r in rows("pods") if r["csv"] == name]
+    if len(hit) != 1:
+        raise LookupError(f"pods.csv has {len(hit)} rows for {name}")
+    return hit[0]
+
+
+# The wB97M-V ladder pool is every W pod that pods.csv records as healthy (not CONTENDED), so a
+# contention flag cannot be swapped without changing the reading.
+W_HEALTHY = tuple(n for n in ("w1", "w2", "w3", "w4", "w4r", "w5") if pod(n)["contended"] == "False")
 
 # --------------------------------------------------------------------------------------------- #
 # N1. Native ladder on the RTX PRO 6000 Workstation (PREREG-1)
@@ -224,10 +244,10 @@ check_true("N2", "L40S X2a has exactly 1 NOISY cell of 6 (not DEGRADED)",
            lambda: sum(noisy("x2a", k) for k in keys("x2a", xc=None)) == 1)
 check_true("N2", "H100 X3 has no NOISY cell",
            lambda: sum(noisy("x3", k) for k in keys("x3", xc=None)) == 0)
-for pod, n in (("x4", 2), ("x4r", 4)):
-    check_true("N2", f"A100 {pod.upper()} has {n} NOISY cells of 9, so DEGRADED (> 20 %)",
-               lambda pod=pod, n=n: sum(noisy(pod, k) for k in keys(pod, xc=None)) == n
-               and n / len(keys(pod, xc=None)) > 0.20)
+for pn, n in (("x4", 2), ("x4r", 4)):
+    check_true("N2", f"A100 {pn.upper()} has {n} NOISY cells of 9, so DEGRADED (> 20 %)",
+               lambda pn=pn, n=n: sum(noisy(pn, k) for k in keys(pn, xc=None)) == n
+               and n / len(keys(pn, xc=None)) > 0.20)
 A100_CLEAN = {  # (pod, mol, xc): (mixed/cache, mixed/stock) as printed in PREREG-2 part 3
     ("x4", "propranolol", "r2scan"): ("1.025", "1.276"), ("x4", "celecoxib", "r2scan"): ("0.991", "1.143"),
     ("x4", "paracetamol", "b3lyp"): ("0.901", "1.091"), ("x4", "propranolol", "b3lyp"): ("0.689", "0.817"),
@@ -237,12 +257,12 @@ A100_CLEAN = {  # (pod, mol, xc): (mixed/cache, mixed/stock) as printed in PRERE
     ("x4r", "paracetamol", "wb97m-v"): ("0.566", "0.596"), ("x4r", "propranolol", "wb97m-v"): ("0.492", "0.509"),
     ("x4r", "celecoxib", "wb97m-v"): ("0.470", "0.488"),
 }
-for (pod, mol, xc), (mc, ms) in A100_CLEAN.items():
+for (pn, mol, xc), (mc, ms) in A100_CLEAN.items():
     k = cell(mol, xc)
-    check_true("N2", f"A100 {pod} {mol} {xc} is a clean (non-NOISY) cell",
-               lambda pod=pod, k=k: not noisy(pod, k))
-    check("N2", f"A100 {pod} {mol} {xc} mixed/cache", lambda pod=pod, k=k: ratio(pod, k, "mixed", "cache"), mc)
-    check("N2", f"A100 {pod} {mol} {xc} mixed/stock", lambda pod=pod, k=k: ratio(pod, k, "mixed", "stock"), ms)
+    check_true("N2", f"A100 {pn} {mol} {xc} is a clean (non-NOISY) cell",
+               lambda pn=pn, k=k: not noisy(pn, k))
+    check("N2", f"A100 {pn} {mol} {xc} mixed/cache", lambda pn=pn, k=k: ratio(pn, k, "mixed", "cache"), mc)
+    check("N2", f"A100 {pn} {mol} {xc} mixed/stock", lambda pn=pn, k=k: ratio(pn, k, "mixed", "stock"), ms)
 check_true("N2", "A100: exactly 12 clean cells across X4 and X4r",
            lambda: sum(not noisy(p, k) for p in ("x4", "x4r") for k in keys(p, xc=None)) == 12)
 
@@ -302,10 +322,10 @@ DS = {  # pod, mol, xc: (max_dg, max_dmu, de, rho_g, rho_mu) as printed
     ("d2b", "warfarin", "wb97m-v"): ("2.20e-6", "1.03e-5", "6.4e-11", "0.84", "0.66"),
     ("d2c", "omeprazole", "wb97m-v"): ("2.17e-6", "1.44e-5", "1.0e-10", "1.57", "0.68"),
 }
-for (pod, mol, xc), banked in DS.items():
+for (pn, mol, xc), banked in DS.items():
     for field, b in zip(("max_dg", "max_dmu", "de", "rho_g", "rho_mu"), banked):
-        check("N4", f"{pod} {mol} {xc} {field}", lambda pod=pod, mol=mol, xc=xc, field=field:
-              ds(pod, mol, xc, field), b)
+        check("N4", f"{pn} {mol} {xc} {field}", lambda pn=pn, mol=mol, xc=xc, field=field:
+              ds(pn, mol, xc, field), b)
 CEIL = {"max_dg": 1e-5, "max_dmu": 1e-4, "de": 1e-8}
 check_true("N4", "17 of 18 downstream cells within every ceiling; the one outside is fluconazole r2SCAN's dipole",
            lambda: [k for k in DS if any(ds(*k, f) > c for f, c in CEIL.items())]
@@ -384,6 +404,12 @@ for (xc, arm), vals in GAIN6.items():
         check("N6", f"MIG gain {m} {xc} {arm}", mig_gain("f0", F1, cell(m, xc), arm), v)
 
 
+def one(s):
+    if len(s) != 1:
+        raise ValueError(f"expected exactly one value, got {sorted(s)}")
+    return next(iter(s))
+
+
 def tiers_of(pods, arm="mixed"):
     pods = (pods,) if isinstance(pods, str) else pods
     return {(r["key"], r["ao_cache_tier"]) for p in pods for r in rows(p) if r["arm"] == arm}
@@ -394,8 +420,8 @@ check_true("N6", "all 6 F0 mixed cells at tier fp64+fp32",
 check_true("N6", "all 6 instance mixed cells at tier fp32 (CACHE_FALLBACK)",
            lambda: {t for _, t in tiers_of(F1)} == {"fp32"} and len({k for k, _ in tiers_of(F1)}) == 6)
 for m, gb in zip(XL3, ("5.55", "5.23", "8.62")):
-    check("N6", f"B3LYP {m} DF tensor (GB), instance", lambda m=m: {
-        float(r["cderi_bytes"]) for r in rows("f1b") if r["key"] == cell(m, "b3lyp")}.pop() / 1e9, gb)
+    check("N6", f"B3LYP {m} DF tensor (GB), instance", lambda m=m: one({
+        float(r["cderi_bytes"]) for r in rows("f1b") if r["key"] == cell(m, "b3lyp")}) / 1e9, gb)
 check_true("N6", "every B3LYP DF tensor on the device, identical size on both cards",
            lambda: all(r["cderi_types"] == "cupy.ndarray" for p in ("f0", "f1b") for r in rows(p)
                        if "/b3lyp/" in r["key"])
@@ -406,8 +432,101 @@ check_true("N6", "no r2SCAN run builds a DF tensor",
                        for p in ("f0", "f1a") for r in rows(p) if "/r2scan/" in r["key"]))
 
 # --------------------------------------------------------------------------------------------- #
+# N7. Flags, fit tiers, counts and disclosures that the claims rest on
+# --------------------------------------------------------------------------------------------- #
+SPEED_PODS = [r["csv"] for r in rows("pods") if int(r["speed_cells"]) > 0]
+
+
+def speed_keys(p):
+    return keys(p, "speed", None, None)
+
+
+for p in SPEED_PODS:
+    check_true("N7", f"{p}: pods.csv speed_cells / noisy_cells / degraded match the data",
+               lambda p=p: (len(speed_keys(p)) == int(pod(p)["speed_cells"])
+                            and sum(noisy(p, k) for k in speed_keys(p)) == int(pod(p)["noisy_cells"])
+                            and (sum(noisy(p, k) for k in speed_keys(p)) / len(speed_keys(p)) > 0.20)
+                            == (pod(p)["degraded"] == "True")))
+check_true("N7", "every row of every pod CSV converged, with no error",
+           lambda: all(r["converged"] == "True" and not r["error"]
+                       for p in rows("pods") for r in rows(p["csv"])))
+check_true("N7", "the only NOISY cell of M0 is paracetamol wB97M-V (both MIG gains for it rest on it)",
+           lambda: [k for k in speed_keys("m0") if noisy("m0", k)] == [cell("paracetamol", "wb97m-v")])
+
+
+def under_1s(p, k):
+    return any(w < 1.0 for a in ("mixed", "cache", "stock")
+               if any(r["key"] == k and r["arm"] == a for r in rows(p)) for w in walls(p, k, a))
+
+
+check_true("N7", "exactly six cells have a warm wall under 1 s, all B3LYP (metformin, paracetamol)",
+           lambda: sorted((p["csv"], k) for p in rows("pods") if int(p["speed_cells"]) > 0
+                          for k in speed_keys(p["csv"]) if under_1s(p["csv"], k)) == sorted([
+               ("l12", cell("metformin", "b3lyp")), ("b1", cell("paracetamol", "b3lyp", "svp")),
+               ("b1", cell("paracetamol", "b3lyp", "mtzvpp")), ("x3", cell("paracetamol", "b3lyp")),
+               ("x4", cell("paracetamol", "b3lyp")), ("x4r", cell("paracetamol", "b3lyp"))]))
+check_true("N7", "XL: r2SCAN/B3LYP mixed at fp64+fp32, wB97M-V at fp64",
+           lambda: {t for _, t in tiers_of(("xl1", "xl2"))} == {"fp64+fp32"}
+           and {t for _, t in tiers_of(("xl3a", "xl3b"))} == {"fp64"})
+check_true("N7", "MIG trio pods: r2SCAN/B3LYP mixed at fp64+fp32 and wB97M-V at fp64, on M0, M1 and M2",
+           lambda: all({t for k, t in tiers_of(p) if "/wb97m-v/" not in k} <= {"fp64+fp32"}
+                       and {t for k, t in tiers_of(p) if "/wb97m-v/" in k} <= {"fp64"}
+                       for p in ("m0", "m1a", "m1b", "m2ar", "m2br"))
+           and len({k for p in M1 for k, _ in tiers_of(p)}) == 8)
+check_true("N7", "A100: 11 of the 12 clean readings are NEUTRAL or HARMS on the precision effect",
+           lambda: sum(ratio(p, cell(m, x), "mixed", "cache") < 1.15
+                       for (p, m, x) in A100_CLEAN) == 11 and len(A100_CLEAN) == 12)
+check("N7", "A100 clean r2SCAN/B3LYP cells: lowest cache/stock",
+      lambda: min(ratio(p, cell(m, x), "cache", "stock") for (p, m, x) in A100_CLEAN if x != "wb97m-v"),
+      "1.153")
+check("N7", "A100 clean r2SCAN/B3LYP cells: highest cache/stock",
+      lambda: max(ratio(p, cell(m, x), "cache", "stock") for (p, m, x) in A100_CLEAN if x != "wb97m-v"),
+      "1.245")
+check_true("N7", "gradient prediction (<= 1e-6 Ha/Bohr) missed in 8 of 12 D1 cells and 14 of 18 cells",
+           lambda: sum(ds(*k, "max_dg") > 1e-6 for k in DS if k[0] == "d1") == 8
+           and sum(ds(*k, "max_dg") > 1e-6 for k in DS) == 14 and len(DS) == 18)
+check_true("N7", "rho_g <= 3 in 11 of 12 D1 cells",
+           lambda: sum(ds(*k, "rho_g") <= 3 for k in DS if k[0] == "d1") == 11)
+check_true("N7", "downstream.csv: only fluconazole r2SCAN is GATE_FAIL; every row carries its pod's RUN_ID",
+           lambda: [(r["csv"], r["key"]) for r in rows("downstream") if r["status"] != "OK"]
+           == [("d1", "downstream/fluconazole/r2scan/mtzvpp")]
+           and all(r["run_id"] == pod(r["csv"])["run_id"] for r in rows("downstream")))
+COLD = {"c0": ("paracetamol", "r2scan", "83.8"), "l12": ("metformin", "r2scan", "96.1"),
+        "m0": ("paracetamol", "r2scan", "82.3"), "m1a": ("paracetamol", "r2scan", "96.0"),
+        "xl1": ("sildenafil", "r2scan", "87.9"), "c0w": ("paracetamol", "wb97m-v", "64.0")}
+for p, (m, x, v) in COLD.items():
+    check("N7", f"cold first mixed run (pair 0) in {p}: {m} {x}, seconds",
+          lambda p=p, m=m, x=x: one({float(r["wall_s"]) for r in rows(p) if r["key"] == cell(m, x)
+                                     and r["arm"] == "mixed" and r["pair"] == "0"}), v)
+
+check("N7", "M0 (Server Edition) B3LYP trio mixed/stock", gm_ratio("m0", "b3lyp", mols=TRIO), "2.019")
+check("N7", "XL r2SCAN geomean without ritonavir (5)", gm_ratio("xl1", "r2scan", mols=LARGE6[:5]), "1.802")
+check("N7", "ritonavir r2SCAN stock warm wall (s)", lambda: med("xl1", cell("ritonavir", "r2scan"), "stock"), "72.2")
+check("N7", "lopinavir r2SCAN stock warm wall (s)", lambda: med("xl1", cell("lopinavir", "r2scan"), "stock"), "50.9")
+check("N7", "A100 wB97M-V mixed/stock, lowest cell (both pods)",
+      lambda: min(ratio(p, k, "mixed", "stock") for p in ("x4", "x4r") for k in keys(p, xc="wb97m-v")), "0.470")
+check("N7", "A100 wB97M-V mixed/stock, highest cell (both pods)",
+      lambda: max(ratio(p, k, "mixed", "stock") for p in ("x4", "x4r") for k in keys(p, xc="wb97m-v")), "0.596")
+check("N7", "H100 celecoxib wB97M-V mixed/stock", lambda: ratio("x3", cell("celecoxib", "wb97m-v"), "mixed", "stock"),
+      "0.521")
+check("N7", "worst B3LYP mixed/stock on H100/A100",
+      lambda: min(ratio(p, k, "mixed", "stock") for p in ("x3", "x4", "x4r") for k in keys(p, xc="b3lyp")), "0.711")
+check("N7", "C0 vs D1: r2SCAN paracetamol gradient residual on C0",
+      lambda: ds("c0", "paracetamol", "r2scan", "max_dg"), "1.368e-6")
+check("N7", "C0 vs D1: r2SCAN paracetamol gradient residual on D1",
+      lambda: ds("d1", "paracetamol", "r2scan", "max_dg"), "1.369e-6")
+for p, (m, x, v) in {"x2a": ("paracetamol", "r2scan", "8.6"), "x3": ("paracetamol", "r2scan", "8.4")}.items():
+    check("N7", f"cold first mixed run (pair 0) in {p}: {m} {x}, seconds",
+          lambda p=p, m=m, x=x: one({float(r["wall_s"]) for r in rows(p) if r["key"] == cell(m, x)
+                                     and r["arm"] == "mixed" and r["pair"] == "0"}), v)
+
+# --------------------------------------------------------------------------------------------- #
 # provenance
 # --------------------------------------------------------------------------------------------- #
+check_true("P", "every RUN_ID is <run>-1-<sha8> and its sentinel path follows the ci-bus pattern",
+           lambda: all(p["run_id"] == f"{p['gh_run']}-1-{p['repo_sha'][:8]}"
+                       and p["sentinel"] == f"ci-results/runs/rfcbench-{p['repo_sha'][:12]}-{p['run_id']}.txt"
+                       for p in rows("pods")))
 check_true("P", "pods.csv lists every CSV in data/ exactly once",
            lambda: sorted(r["csv"] for r in rows("pods")) == sorted(
                f[:-4] for f in os.listdir(DATA) if f.endswith(".csv")
@@ -420,11 +539,17 @@ def main():
     bad, known = [], []
     width = max(len(r[1]) for r in results)
     for claim, what, got, banked, ok in results:
-        why = KNOWN_DISCREPANCIES.get((claim, what))
-        if why is not None:
-            tag = "STALE" if ok else "DISC"
-            (bad if ok else known).append(what)
-            print(f"{tag:4s} {claim:3s} {what:<{width}}  {got:>12}  (banked {banked}): {why}")
+        entry = KNOWN_DISCREPANCIES.get((claim, what))
+        if entry is not None:
+            want, why = entry
+            if ok:
+                tag = "STALE"
+            elif got == want:
+                tag = "DISC"
+            else:
+                tag = "FAIL"
+            (known if tag == "DISC" else bad).append(what)
+            print(f"{tag:5s} {claim:3s} {what:<{width}}  {got:>12}  (printed {banked}, data {want}): {why}")
             continue
         if not ok:
             bad.append(what)

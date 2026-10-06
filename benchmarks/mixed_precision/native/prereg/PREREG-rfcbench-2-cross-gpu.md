@@ -245,3 +245,14 @@ It falls with molecule size for every functional.
   gated on the device's FP64:FP32 throughput. The FP64 AO cache can stay on independently: it pays
   1.15–1.25 on the H100 and on the clean A100 cells for r2SCAN and B3LYP.
 - This is a reading of these pods, not a tested gating rule.
+
+
+### Erratum (2026-10-06): found by the evidence-package review (`benchmarks/mixed_precision/native/` in the fork)
+
+The text above is left as written. These corrections supersede it where they differ; `verify_native.py` checks each corrected number against the data.
+
+- **Part 2:** L12's healthy trio B3LYP is **1.860** (1.8595), not 1.859.
+- **Part 3, undisclosed flags.** The paracetamol B3LYP cell has warm walls under 1 s (`under_1s`) on the H100 (X3: medians 0.60–0.73 s) and on both A100 pods. On the H100 that cell feeds the quoted B3LYP precision effect, 0.745.
+- **Part 3, A100 wording.** "Eleven of the twelve clean cells" means 12 clean *readings* over 9 distinct cells: three cells are clean on both pods. Applying PREREG-0 §6's "two infra-starved repeats" rule to two DEGRADED pods extends that rule; it was not written for that case.
+- **Part 3, the cache alone.** "1.15–1.25 on the H100 and on the clean A100 cells" holds for r2SCAN and B3LYP only. For wB97M-V the cache alone is NEUTRAL: 1.070 on the H100, 1.03–1.06 on the A100.
+- **Part 3, "gated on the device's FP64:FP32 throughput".** The data has only two FP64:FP32 levels, and those two groups also differ in architecture and bandwidth. It is a hypothesis, not a supported criterion; the mechanism and the threshold are unknown.

@@ -20,10 +20,20 @@ The SCF then switches one way back to FP64. It cannot report convergence until t
 iterations were built entirely in FP64.
 
 The target is GPUs whose FP64 throughput is a small fraction of FP32, such as RTX and workstation
-Blackwell cards. An external prototype of the same scheme measured these whole-SCF speedups
-against stock GPU4PySCF 1.8.1 on an RTX PRO 6000 Blackwell:
-- r2SCAN, 24 drug-like molecules: **1.78–1.84×** tier geometric means;
-- B3LYP, with cuTENSOR on both sides, 4 molecules: **1.92×**.
+Blackwell cards. **This code** measured these whole-SCF speedups against stock GPU4PySCF 1.8.1 on an
+RTX PRO 6000 Blackwell Workstation (24 drug-like molecules, def2-mTZVPP, R = 3; details and caveats
+in `benchmarks/mixed_precision/native/CLAIMS.md`):
+- r2SCAN **1.66×**, B3LYP **1.78×** (one pod each), wB97M-V with the VV10 component **2.91×** (five
+  pods);
+- measured with the opt-in FP64 AO cache on, an unpruned grid and B3LYP `xc_switch_tol=3e-4`. The
+  library defaults and pruned grids were **not** measured, and should give smaller gains.
+
+**Do not enable it on FP64-strong GPUs.** On an H100 and an A100 it made wB97M-V about 2× slower and
+B3LYP up to 1.4× slower. The code does not detect this today (see Limitations).
+
+An earlier external prototype of the same scheme measured r2SCAN 1.78–1.84× (tier geomeans) and
+B3LYP 1.92× (4 molecules, cuTENSOR on both sides); the port's r2SCAN at the prototype's
+`conv_tol_grad = 1e-5` reads 1.586.
 
 In every run, the final energy matched stock to ≤ 1e-9 Ha (worst 1.7e-10 Ha), and cycle counts
 matched or differed by one. See
@@ -34,7 +44,7 @@ aggregate.
 
 | file | change |
 |---|---|
-| `gpu4pyscf/dft/mixed_precision.py` (new) | `MixedPrecision` policy, one-way `PhaseController`, per-SCF state and record, FP32 AO-value cache, FP32 rho/vxc block kernels, `nr_rks_fp32`, support checks |
+| `gpu4pyscf/dft/mixed_precision.py` (new) | `MixedPrecision` policy, one-way `PhaseController`, per-SCF state and record, FP32 AO-value cache and the opt-in FP64 AO cache (`ao_cache_fp64`, tiered by predicted size), FP32 rho/vxc block kernels, `nr_rks_fp32`, support checks |
 | `gpu4pyscf/df/df_jk.py` | `get_jk`: optional FP32 path for the two K contractions (chunked FP32 `cderi`, FP64 accumulator). `_DFHF.get_veff` (RHF branch) reports each iteration to the policy. |
 | `gpu4pyscf/dft/rks.py` | `get_veff` (non-DF) reports to the policy. The first FP64 build after an FP32 phase is a full J rebuild. Adds `mixed_precision` / `mixed_precision_record` to `KohnShamDFT._keys`. |
 | `gpu4pyscf/scf/hf.py` | `scf()` opens and closes the policy's per-run state. `_kernel` refuses convergence without an FP64 tail: it forces the switch and continues. |
@@ -96,9 +106,15 @@ two files and touches `numint.py`; it is not in that count.
 
 ## Limitations and open questions
 
-- **Speed numbers.** The published ones come from the prototype, not from this implementation.
-  This PR's own validation is a correctness gate; a like-for-like speed re-measurement with this
-  code is still to do.
+- **Speed numbers.** They come from this code (`native/`), at the non-default settings listed
+  there. The defaults are not measured. The headline rows rest on single pods for r2SCAN and B3LYP,
+  and same-card pods differ by 10–20 %.
+- **FP64-strong GPUs.** The FP32 switch is harmful on the H100 and A100 tested, and nothing in the
+  code warns or refuses there. Open question for maintainers: add a device guard (for example by
+  compute capability), or document it only? Only two FP64:FP32 levels were measured, so no
+  threshold is established.
+- **Cold start.** On Blackwell the first mixed SCF in a process took 64–96 s, against 2–14 s warm.
+  How much of that is the mode's own kernel compilation was not separated.
 - **Scope.** The analytic gradient, the Hessian and UKS are out of scope. Range-separated and NLC
   functionals are out of scope for `xc` / `k`; the VV10 component below is the only path that
   treats an NLC functional.
@@ -151,8 +167,8 @@ stock statements run unchanged; positional callers are untouched.
   against stock ≤ 1.16e-7 relative (FP32) and ≤ 2.3e-13 (df64).
 - Before the df64 tail, the same FP32 phase with a stock FP64 tail gave 1.363× (tol 1e-4) and
   1.592× (tol 1e-5) on celecoxib.
-- Not measured: other cards, functionals or nlcgrids, gradients, open shell. The port's own GPU
-  validation is a correctness gate, not a speed re-measurement.
+- Not measured: other functionals or nlcgrids, gradients, open shell. The port's speed on other
+  cards is in `native/` (wB97M-V: L40S 2.99×; H100 0.58× and A100 0.47–0.60×, i.e. slower).
 
 **Files.**
 

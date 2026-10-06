@@ -265,3 +265,15 @@ The cycle counts per cell match M0's (B3LYP K split `fp32*8` then `fp64*5`/`*6`)
 **Pods spent.** Seven billed pods: M0, M1a, M1b, M2a, M2b, M2ar and M2br. M2ar and M2br are two of
 PREREG-0 Amendment 3's three CONTENDED re-runs, and the owner approved them per Amendment 1 here.
 The reserve pod M3 was not used.
+
+
+### Erratum (2026-10-06): found by the evidence-package review (`benchmarks/mixed_precision/native/` in the fork)
+
+The text above is left as written. These corrections supersede it where they differ; `verify_native.py` checks each corrected number against the data.
+
+- **Date.** The RESULT heading says 2026-10-06. It was committed on 2026-10-05.
+- **L12's trio B3LYP** is **1.860**, not 1.859.
+- **r2SCAN stock MIG gain.** "1.4–1.6× (stock)" should read **1.35–1.55×**: the per-cell values are 1.349–1.548.
+- **Withdrawn.** "A sustained ~18 % throughput gain at scale is material" was added after the data, by commit `ecd7b68c`. "At scale" contradicts the untested concurrency assumption stated in the same RESULT.
+- **Baseline.** The whole card ran **one SCF at a time**. Four concurrent SCFs (or MPS) on the whole card were not measured, and that is the comparison an operator would face. The whole-card side rests on a single pod (M0).
+- **Undisclosed flag.** M0's paracetamol wB97M-V cell is NOISY (stock spread 15.7 %). Both wB97M-V paracetamol MIG gains rest on it.

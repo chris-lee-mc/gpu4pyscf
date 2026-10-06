@@ -130,3 +130,10 @@ geomean over 4 molecules):
   limitation appears whether the system grows by more atoms or by a bigger basis.
 - **NOISY cells:** 2 of 24, not DEGRADED. They are retained.
 
+
+### Erratum (2026-10-06): found by the evidence-package review (`benchmarks/mixed_precision/native/` in the fork)
+
+The text above is left as written. These corrections supersede it where they differ; `verify_native.py` checks each corrected number against the data.
+
+- **Fit.** "The large molecules' AO caches took 16.5–37.6 GiB, all at the `fp64+fp32` tier" holds for r2SCAN and B3LYP (XL1, XL2). The wB97M-V cells (XL3a, XL3b) are at their expected tier, `fp64` (12.2 and 16.1 GiB). All cells are TREATED, as stated.
+- **r2SCAN geomean.** The 1.931 includes ritonavir at 2.729, whose stock wall (72.2 s) is anomalously above lopinavir's (50.9 s). Without ritonavir the geomean is 1.802. The stock behaviour on ritonavir was not investigated.
