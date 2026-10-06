@@ -92,10 +92,26 @@ def get_veff(ks, mol=None, dm=None, dm_last=None, vhf_last=None, hermi=1):
     initialize_grids(ks, mol, dm)
 
     ni = ks._numint
+    # Opt-in mixed precision (gpu4pyscf.dft.mixed_precision): None unless an
+    # SCF with mf.mixed_precision set is running.
+    mp_state = getattr(ks, '_mixed_precision_state', None)
+    k_prec = 'fp64'
+    full_rebuild = False
+    if mp_state is not None:
+        xc_prec, k_prec, full_rebuild = mp_state.begin_call()
     if hermi == 2:  # because rho = 0
         n, exc, vxc = 0, 0, 0
     else:
-        n, exc, vxc = ni.nr_rks(mol, ks.grids, ks.xc, dm)
+        res = None
+        if mp_state is not None and xc_prec == 'fp32':
+            from gpu4pyscf.dft import mixed_precision
+            res = mixed_precision.nr_rks_fp32(mp_state, ni, mol, ks.grids, ks.xc, dm)
+            if res is None:     # FP32 AO copy did not fit: this and later calls FP64
+                mp_state._cur['xc'] = 'fp64'
+        if res is None:
+            res = ni.nr_rks(mol, ks.grids, ks.xc, dm)
+        n, exc, vxc = res
+        exc_xc = exc
         if ks.do_nlc():
             if ni.libxc.is_nlc(ks.xc):
                 xc = ks.xc
@@ -111,6 +127,10 @@ def get_veff(ks, mol=None, dm=None, dm_last=None, vhf_last=None, hermi=1):
 
     dm_orig = dm = cupy.asarray(dm)
     vj_last = getattr(vhf_last, 'vj', None)
+    if full_rebuild:
+        # First FP64 K build after an FP32 phase: rebuild J/K from the full
+        # density so that no FP32 K increment survives in the potential.
+        vj_last = None
     if vj_last is not None:
         dm_last = cupy.asarray(dm_last)
         dm = dm - dm_last
@@ -122,7 +142,11 @@ def get_veff(ks, mol=None, dm=None, dm_last=None, vhf_last=None, hermi=1):
 
     if ni.libxc.is_hybrid_xc(ks.xc):
         omega, alpha, hyb = ni.rsh_and_hybrid_coeff(ks.xc, spin=mol.spin)
-        vk = ks.get_k(mol, dm, hermi, omega, alpha, hyb)
+        if mp_state is not None:
+            with mp_state.k_scope(getattr(ks, 'with_df', None), k_prec):
+                vk = ks.get_k(mol, dm, hermi, omega, alpha, hyb)
+        else:
+            vk = ks.get_k(mol, dm, hermi, omega, alpha, hyb)
         vk *= .5
         vhf -= vk
         if vj_last is not None:
@@ -137,6 +161,8 @@ def get_veff(ks, mol=None, dm=None, dm_last=None, vhf_last=None, hermi=1):
             vhf += asarray(vhf_last.vj)
         vxc += vhf
     t0 = log.timer('veff', *t0)
+    if mp_state is not None:
+        mp_state.end_call(exc_xc if hermi != 2 else 0.)
     vxc = tag_array(vxc, ecoul=ecoul, exc=exc, vj=vhf)
     return vxc
 
@@ -176,7 +202,12 @@ def energy_elec(ks, dm=None, h1e=None, vhf=None):
 # which relies on pyscf.scf.dispersion.parse_dft. It does NOT use gpu4pyscf.scf.dispersion.parse_dft.
 class KohnShamDFT(rks.KohnShamDFT):
 
-    _keys = {'cphf_grids', *rks.KohnShamDFT._keys}
+    _keys = {'cphf_grids', 'mixed_precision', 'mixed_precision_record',
+             *rks.KohnShamDFT._keys}
+
+    # Opt-in mixed-precision SCF: a gpu4pyscf.dft.mixed_precision.MixedPrecision
+    # instance, or None (default, plain FP64).
+    mixed_precision = None
 
     def to_rhf(self):
         '''Convert the input mean-field object to a RHF/ROHF object.
