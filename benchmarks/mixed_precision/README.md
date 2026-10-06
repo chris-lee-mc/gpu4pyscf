@@ -8,6 +8,11 @@ here:
 python verify_aggregates.py      # stdlib only; exit 0 = every quoted aggregate reproduced
 ```
 
+The **native-port campaign** is in [`native/`](native/README.md): the fork's own port, measured as a
+user runs it, on the RTX PRO 6000 (Workstation and Server), L40S, H100, A100 and RTX PRO 6000 MIG
+1g.24gb instances, under pre-registered protocols. Its claims are in
+[`native/CLAIMS.md`](native/CLAIMS.md), and `python native/verify_native.py` reproduces them.
+
 ## Using the mode
 
 ```python
@@ -21,8 +26,10 @@ print(mf.mixed_precision_record)   # the precision of each iteration, and why it
 ```
 
 - **Who it is for.** GPUs whose FP64 throughput is a small fraction of FP32, such as RTX and
-  workstation Blackwell cards. On FP64-strong data-centre GPUs (e.g. H100, A100) it may not pay
-  off.
+  workstation Blackwell cards. **On FP64-strong data-centre GPUs it harms B3LYP and wB97M-V**: the
+  FP32 switch alone measured 0.745 and 0.539 on an H100, and the A100's clean cells agree. Leave it
+  off there, or gate it on the device's FP64:FP32 ratio ([`native/CLAIMS.md`](native/CLAIMS.md)
+  C3). The FP64 AO cache alone still pays about 1.2× on those cards.
 - **Opt-in only.** It is off unless `mf.mixed_precision` is set. With it unset, nothing changes.
 - **What runs in FP32.**
   - XC: the density and XC-potential contractions, against an FP32 copy of the AO values that is
