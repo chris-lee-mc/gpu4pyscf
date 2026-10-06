@@ -194,24 +194,29 @@ net loss. The gains above are steady-state figures.
 
 ## What can and cannot be verified from this package
 
-- **Can:** every number in this file, against the per-run CSVs (`verify_native.py`).
-  - `data/SHA256SUMS` catches an accidental edit. It is not tamper evidence: it sits in the same
-    directory and can be regenerated.
-  - The CSVs carry consistent run identifiers.
-  - The 30 geometries check against their checksums.
-  - The accuracy gates (|ΔE| ≤ 1e-8 Ha, cycles ±1), the policy and the cache tier are re-derived on
-    every timed row.
-- **Cannot, from public material:**
-  - The sentinels the CSVs were extracted from, the measuring harness, the extractor, and the git
-    history that orders protocols, amendments and runs all live in
-    `chris-lee-mc/gpu-conformer-engine`, which is **private**.
-  - `verify_native.py` checks claims against CSVs, not CSVs against sentinels. Fields that exist
-    only in the sentinels cannot be checked here, including the card model and the idle power.
-  - Two governing amendments (PREREG-0 Amendment 3, PREREG-6 Amendment 1) were committed 17 s and
-    87 s before the dispatches they govern, on a results branch; the dispatched code does not
-    contain them. Their order rests on commit times.
-- **Dates.** Some RESULT and status dates in `prereg/` are a day late (written 2026-10-06 for
-  commits of 2026-10-05). See the ledger.
+- **Can, with nothing but this directory** (`verify_native.py`, 498 checks):
+  - every number in this file, recomputed from the per-run CSVs;
+  - every per-run CSV, re-extracted from the pod's own result file (`provenance/sentinels/`) by the
+    shipped extractor, column for column;
+  - each pod's status, contention, idle power, NOISY and DEGRADED flags;
+  - the downstream readings;
+  - the accuracy gates (|ΔE| ≤ 1e-8 Ha, cycles ±1), the policy and the cache tier, on every timed
+    row;
+  - the 30 geometries, against their checksums.
+
+  `data/SHA256SUMS` and the sentinel hashes in `pods.csv` catch accidental edits. They are not
+  tamper evidence: they sit beside what they hash.
+- **Cannot be verified independently** (see `provenance/README.md`):
+  - **Where the sentinels came from.** The pods wrote them to a branch of the private
+    `chris-lee-mc/gpu-conformer-engine`. Nothing here proves a sentinel came from a GPU run.
+  - **The order of protocols and runs.** `provenance/TIMELINE.csv` lists both, but the protocol
+    times are git committer times and the run times come from a private repository's Actions API.
+    Two governing amendments (PREREG-0 Amendment 3, PREREG-6 Amendment 1) were committed only 17 s
+    and 87 s before the dispatches they govern, on a results branch; the dispatched code does not
+    contain them.
+  - **The exact harness bytes.** `provenance/harness/` is the harness at `cab1dcc7`; each pod ran
+    at the earlier commit listed in `pods.csv`.
+- **Dates.** A few status dates and one RESULT date in `prereg/` are a day late. See the ledger.
 - **`reproduce_native.py`** transcribes the measurement path and has not been run on a GPU in this
   form.
 

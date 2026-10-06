@@ -18,10 +18,11 @@ python verify_native.py      # stdlib only; exit 0 = every quoted number reprodu
 | file | what it is |
 |---|---|
 | `CLAIMS.md` | What the RFC may claim, and what it must not. Includes the measured configuration, negative results, cold start, what can and cannot be verified, and a ledger of every miss, correction and lapse. |
-| `verify_native.py` | Recomputes 398 quoted numbers and facts from `data/` at their printed precision. It checks `data/SHA256SUMS` first, fails closed, and pins its own check count. A listed known discrepancy must still recompute to its corrected value. |
+| `verify_native.py` | Recomputes 498 quoted numbers and facts from `data/` at their printed precision, and re-extracts every CSV from its pod's sentinel. It checks `data/SHA256SUMS` first, fails closed, and pins its own check count. A listed known discrepancy must still recompute to its corrected value. |
 | `reproduce_native.py` | Re-measures one speed cell on your GPU with the campaign's settings, cuTENSOR preload and cuTENSOR gate. Transcribed from the harness and dry-run-tested only: see its header. |
 | `SOURCES.md` | Pod, GitHub run, commit, card, contention and noise flags behind every CSV. |
 | `data/*.csv` | Per-run walls, energies, cycles, convergence and cache tiers (one CSV per pod), plus `pods.csv`, `downstream.csv` and `tiers.csv`. |
+| `provenance/` | The 33 pod sentinels, the extractor, a harness snapshot and a protocol/run timeline. See its README. |
 | `prereg/` | The seven protocols, PREREG-rfcbench-0 to -6, with predictions, gates, dated amendments and RESULTs. |
 
 **How to read the protocols.**
@@ -35,9 +36,11 @@ python verify_native.py      # stdlib only; exit 0 = every quoted number reprodu
     seen. On whole cards it replaced only low readings (C0, W4); on MIG it replaced two pods whose
     MIG gains were higher than their re-runs'.
 
-**Limits on verification.**
-- The sentinels, the measuring harness and the protocol history live in a private repository.
-- From this package alone, a reader can check claims against CSVs, but not CSVs against sentinels,
-  nor the order of protocols and runs. `CLAIMS.md` spells this out.
-- Corrections found while building and reviewing the package are listed in its ledger. Those
-  include miscounts and dates in the RESULT texts, and two numbers rounded one unit off.
+**Provenance.**
+- `provenance/` ships every pod's result file (sentinel), the extractor, a snapshot of the harness,
+  and a timeline of protocol commits against run times.
+- `verify_native.py` re-extracts every CSV from its sentinel and checks it, so a reader can follow
+  run → CSV → claim without access to the private repository where the runs were orchestrated.
+- What remains self-attested (the sentinels' origin, and the order of protocols and runs) is listed
+  in `provenance/README.md` and `CLAIMS.md`.
+- Corrections found while building and reviewing the package are in the `CLAIMS.md` ledger.

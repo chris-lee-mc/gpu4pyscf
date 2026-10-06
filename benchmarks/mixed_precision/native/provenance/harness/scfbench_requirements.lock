@@ -1,0 +1,55 @@
+# scfbench pod requirements -- EXACTLY pinned, transitive closure included.
+#
+# Why a lock at all (M3): the pod's install used to be `pip install "numpy>=1.24" scipy pyscf` +
+# `pip install gpu4pyscf-cuda12x==1.8.1`, i.e. three floating requirements resolved fresh on every
+# paid pod. That is two separate problems:
+#   * `--no-index --find-links` cannot be used at all without a complete pinned set, so the keyed
+#     wheelhouse (the measured 123 s .. 3927 s install band) has no prerequisite to stand on;
+#   * a month of upstream drift can sit between two runs of the SAME sha, which CLAUDE.md already
+#     names as the reason per-job durations are not a controlled comparison.
+#
+# The hash of THIS FILE is the wheelhouse asset key (`REQHASH = sha256(lock)[:8]`, see
+# runpod_scfbench.py:req_hash). Editing any byte -- including a comment -- changes the key, so an
+# upgrade can only ever MISS and rebuild. There is no path by which a stale wheelhouse is served
+# against a changed lock.
+#
+# PROVENANCE. The five pins the banked sentinels record verbatim
+# (`ci-results/scfbench-01ba90fd49ec.txt`, meta.versions: gpu4pyscf-cuda12x==1.8.1, pyscf==2.14.0,
+# cupy-cuda12x==14.1.1, numpy==2.2.6, scipy==1.15.3) are the anchor. The rest is the transitive
+# closure pip itself resolves from them, restricted to what has a cp310/py3 x86_64 artifact --
+# python3.10 is what `nvidia/cuda:12.8.1-devel-ubuntu22.04` ships, and the wheelhouse key says so
+# (`py310`). Resolution is NOT taken on faith: the closure below was produced by a `pip install
+# --dry-run --report` against these anchors and re-checked with `--python-version 310
+# --only-binary=:all:`, which is why `networkx` is 3.4.2 and not the 3.6.1 a python3.11 host
+# resolves -- 3.6.1 declares `requires_python >= 3.11` and would fail on the pod.
+#
+# NOT PINNED HERE, deliberately:
+#   * pip / wheel: the pod's `pip install --upgrade pip setuptools wheel` self-upgrade runs online
+#     before this file is used, exactly as it did before M3. Pinning them here would change what
+#     that step does rather than what this file installs.
+#   * fastrlock: cupy-cuda12x 14.1.1 does NOT depend on it (its requires_dist is `numpy<2.6,>=2.0`
+#     + `cuda-pathfinder==1.*,>=1.3.4`; fastrlock was a cupy 13 dependency). Adding it would install
+#     a package the measured recipe never had, which is a change to what is being measured.
+#
+# `geometric` is the one sdist in the set (upstream ships no wheel). It is pure python and builds in
+# seconds, but it does mean the offline install needs a build backend it cannot fetch: the pod's
+# online arm therefore downloads `setuptools`/`wheel` into the same wheelhouse, and pip's build
+# isolation resolves them through the same `--find-links`.
+
+# -- the anchors, as banked -------------------------------------------------------------------- #
+gpu4pyscf-cuda12x==1.8.1
+pyscf==2.14.0
+cupy-cuda12x==14.1.1
+numpy==2.2.6
+scipy==1.15.3
+
+# -- the closure ------------------------------------------------------------------------------- #
+gpu4pyscf-libxc-cuda12x==0.8.1
+pyscf-dispersion==1.5.0
+cuda-pathfinder==1.6.0
+h5py==3.16.0
+geometric==1.1.1
+networkx==3.4.2
+six==1.17.0
+packaging==26.3
+setuptools==84.0.0

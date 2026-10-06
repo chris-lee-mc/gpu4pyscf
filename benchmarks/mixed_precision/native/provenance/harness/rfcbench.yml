@@ -1,0 +1,78 @@
+name: rfcbench RFC evidence campaign (native mixed precision, RunPod)
+
+# workflow_dispatch ONLY, with no `paths:` filter: never reachable from a push or pull_request, so it
+# cannot fire kernel-validation's 49-pod matrix. The launcher itself refuses to start while any
+# other run of this repository is queued or in progress (both are checked).
+#
+# Spec: docs/upstream/PREREG-rfcbench-0-measurand.md (measurand, gates, rules) and the scoped
+# PREREG-rfcbench-1..5. One pod per dispatch; mode=gputypes launches NO pod (it lists RunPod GPU
+# types and banks the listing). Every input is a closed set, validated on the free runner before
+# anything is spent; a dispatch whose work over-estimate exceeds WORK_CAP - 300 s is refused.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "commission | ladder | cross | large | basis | downstream | mig | migfit | gputypes"
+        type: choice
+        required: true
+        options: [commission, ladder, cross, large, basis, downstream, mig, migfit, gputypes]
+      gpu:
+        description: "pro6000 | 5090 | l40s | h100 | a100 | pro6000mig (blank = the mode's only class; cross needs one)"
+        type: string
+        default: ""
+      fork_sha:
+        description: "Full 40-hex fork commit (its gpu4pyscf/ must equal VALIDATED_FORK_SHA's); blank only for gputypes"
+        type: string
+        default: ""
+      fork_repo:
+        description: "Fork repository owner/name (blank = chris-lee-mc/gpu4pyscf)"
+        type: string
+        default: ""
+      mols:
+        description: "Molecule filter, comma-separated (ladder also takes tier tokens S, M, L); blank = the mode's set"
+        type: string
+        default: ""
+      xcs:
+        description: "Functional filter: subset of r2scan,b3lyp,wb97m-v; blank = the mode's default"
+        type: string
+        default: ""
+      bases:
+        description: "Basis filter (basis mode): subset of svp,mtzvpp,tzvp; blank = all"
+        type: string
+        default: ""
+      repeats:
+        description: "Warm pairs R, 2..5 (blank = 3)"
+        type: string
+        default: ""
+      bridge:
+        description: "ladder only: 1 adds the R=1 r2SCAN bridge leg at conv_tol_grad=1e-5"
+        type: string
+        default: ""
+
+permissions:
+  contents: write   # bank the ci-bus sentinel
+  actions: read     # the serialisation gate lists queued / in-progress runs
+
+jobs:
+  rfcbench:
+    name: rfcbench ${{ inputs.mode }} ${{ inputs.gpu }} (GPU)
+    runs-on: ubuntu-latest
+    timeout-minutes: 95
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run one rfcbench pod (or the gputypes listing)
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GIT_SHA: ${{ github.sha }}
+          RFCBENCH_MODE: ${{ inputs.mode }}
+          RFCBENCH_GPU: ${{ inputs.gpu }}
+          RFCBENCH_FORK_SHA: ${{ inputs.fork_sha }}
+          RFCBENCH_FORK_REPO: ${{ inputs.fork_repo }}
+          RFCBENCH_MOLS: ${{ inputs.mols }}
+          RFCBENCH_XCS: ${{ inputs.xcs }}
+          RFCBENCH_BASES: ${{ inputs.bases }}
+          RFCBENCH_REPEATS: ${{ inputs.repeats }}
+          RFCBENCH_BRIDGE: ${{ inputs.bridge }}
+        run: python .github/scripts/runpod_rfcbench.py

@@ -629,6 +629,94 @@ check_true("P", "every speed CSV row carries its pod's RUN_ID",
            lambda: all({r["run_id"] for r in rows(p["csv"])} == {p["run_id"]} for p in rows("pods")))
 
 
+# --------------------------------------------------------------------------------------------- #
+# P2. Provenance: every CSV re-extracted from its shipped sentinel by the shipped extractor
+# --------------------------------------------------------------------------------------------- #
+PROV = os.path.join(HERE, "provenance")
+
+
+def _extractor():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("rfcbench_extract_shipped",
+                                                  os.path.join(PROV, "rfcbench_extract.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _sentinel(name):
+    with open(os.path.join(PROV, "sentinels", name + ".txt"), "rb") as fh:
+        return fh.read()
+
+
+def _sha(b):
+    import hashlib
+    return hashlib.sha256(b).hexdigest()
+
+
+def _reextracted_matches(name):
+    """The CSV in data/ equals, column for column, what the shipped extractor writes from the shipped
+    sentinel (columns the CSV carries; older CSVs predate the cderi_* columns)."""
+    import io
+    X = _extractor()
+    p = pod(name)
+    text = _sentinel(name).decode()
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=X.CSV_FIELDS)
+    w.writeheader()
+    w.writerows(X.csv_rows(text, p["run_id"]))
+    fresh = list(csv.DictReader(io.StringIO(buf.getvalue())))
+    have = rows(name)
+    if len(fresh) != len(have) or not have:
+        return False
+    cols = [c for c in have[0] if c in fresh[0]]
+    return all(a[c] == b[c] for a, b in zip(have, fresh) for c in cols) and len(cols) == len(have[0])
+
+
+def _flags_match(name):
+    X = _extractor()
+    p = pod(name)
+    out = X.extract(_sentinel(name).decode(), p["run_id"], unquotable=True)
+    c = out.get("contended")
+    return (out["status"] == p["status"]
+            and ("" if c is None else str(c)) == p["contended"]
+            and ("" if out.get("idle_power_w") is None else str(out["idle_power_w"])) == p["idle_power_w"]
+            and str(out["noisy"]) == p["noisy_cells"] and str(out["degraded"]) == p["degraded"]
+            and str(len(out["cells"])) == p["speed_cells"])
+
+
+def _downstream_matches():
+    X = _extractor()
+    got = []
+    for p in rows("pods"):
+        out = X.extract(_sentinel(p["csv"]).decode(), p["run_id"], unquotable=True)
+        for d in out.get("downstream") or []:
+            got.append((p["csv"], d["key"], d["status"], d["readings"]))
+    have = rows("downstream")
+    if len(got) != len(have) or not have:
+        return False
+    for (pn, key, status, rd), r in zip(got, have):
+        if (pn, key, status) != (r["csv"], r["key"], r["status"]):
+            return False
+        for f in ("max_dg", "max_dmu", "de", "rho_g", "rho_mu", "max_dg_sp", "max_dmu_sp"):
+            if float(rd[f]) != float(r[f]):
+                return False
+    return True
+
+
+for _p in rows("pods"):
+    _n = _p["csv"]
+    check_true("P2", f"{_n}: shipped sentinel matches pods.csv sentinel_sha256 and carries its RUN_ID",
+               lambda n=_n: _sha(_sentinel(n)) == pod(n)["sentinel_sha256"]
+               and _sentinel(n).decode().splitlines()[1].strip() == f"RUN_ID={pod(n)['run_id']}")
+    check_true("P2", f"{_n}: CSV re-extracted from the sentinel by the shipped extractor is identical",
+               lambda n=_n: _reextracted_matches(n))
+    check_true("P2", f"{_n}: status / contention / idle W / NOISY / DEGRADED / cells re-derived from the sentinel",
+               lambda n=_n: _flags_match(n))
+check_true("P2", "downstream.csv re-derived from the D1/D2/C0 sentinels is identical",
+           _downstream_matches)
+
+
 def data_integrity():
     """Every file in data/ must be listed in data/SHA256SUMS with a matching hash, and every listed
     file must exist: a missing, extra or edited data file is a FAIL before any number is read."""
@@ -652,7 +740,7 @@ def data_integrity():
     return probs
 
 
-EXPECTED_CHECKS = 398   # pinned: a check that silently disappears (or appears) is a FAIL
+EXPECTED_CHECKS = 498   # pinned: a check that silently disappears (or appears) is a FAIL
 
 
 def main():

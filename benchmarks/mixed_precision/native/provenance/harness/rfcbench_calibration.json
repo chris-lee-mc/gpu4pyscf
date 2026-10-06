@@ -1,0 +1,81 @@
+{
+ "pro6000": {
+  "cells": {
+   "celecoxib|b3lyp|mtzvpp|cache": 16.390605,
+   "celecoxib|b3lyp|mtzvpp|mixed": 10.262599999999999,
+   "celecoxib|b3lyp|mtzvpp|stock": 16.684659999999997,
+   "celecoxib|r2scan|mtzvpp|cache": 18.359979999999997,
+   "celecoxib|r2scan|mtzvpp|mixed": 11.521965,
+   "celecoxib|r2scan|mtzvpp|stock": 18.87173,
+   "celecoxib|wb97m-v|mtzvpp|cache": 161.546595,
+   "celecoxib|wb97m-v|mtzvpp|mixed": 82.89476,
+   "celecoxib|wb97m-v|mtzvpp|stock": 161.99405999999996,
+   "paracetamol|b3lyp|mtzvpp|cache": 2.3484149999999997,
+   "paracetamol|b3lyp|mtzvpp|mixed": 1.38391,
+   "paracetamol|b3lyp|mtzvpp|stock": 2.473535,
+   "paracetamol|r2scan|mtzvpp|cache": 3.876765,
+   "paracetamol|r2scan|mtzvpp|mixed": 2.561855,
+   "paracetamol|r2scan|mtzvpp|stock": 4.11194,
+   "paracetamol|r2scan|svp|mixed": 1.61391,
+   "paracetamol|r2scan|svp|stock": 2.79013,
+   "paracetamol|wb97m-v|mtzvpp|cache": 33.17267,
+   "paracetamol|wb97m-v|mtzvpp|mixed": 15.920599999999999,
+   "paracetamol|wb97m-v|mtzvpp|stock": 33.392089999999996,
+   "propranolol|b3lyp|mtzvpp|cache": 8.796809999999999,
+   "propranolol|b3lyp|mtzvpp|mixed": 5.4765299999999995,
+   "propranolol|b3lyp|mtzvpp|stock": 9.059585,
+   "propranolol|r2scan|mtzvpp|cache": 12.000019999999997,
+   "propranolol|r2scan|mtzvpp|mixed": 7.871865,
+   "propranolol|r2scan|mtzvpp|stock": 12.425059999999998,
+   "propranolol|wb97m-v|mtzvpp|cache": 123.13486999999999,
+   "propranolol|wb97m-v|mtzvpp|mixed": 57.92595999999999,
+   "propranolol|wb97m-v|mtzvpp|stock": 123.411445
+  },
+  "powerlaw": {
+   "b3lyp|cache": {
+    "a": 0.005380737533949534,
+    "p": 2.370187096273435
+   },
+   "b3lyp|mixed": {
+    "a": 0.0025758766508268797,
+    "p": 2.449502252920514
+   },
+   "b3lyp|stock": {
+    "a": 0.006299956043026145,
+    "p": 2.328839685741712
+   },
+   "r2scan|cache": {
+    "a": 0.027137108506521797,
+    "p": 1.9256131707451138
+   },
+   "r2scan|mixed": {
+    "a": 0.020317272367031822,
+    "p": 1.8734657115335924
+   },
+   "r2scan|stock": {
+    "a": 0.03187013316927098,
+    "p": 1.8862337113655139
+   },
+   "wb97m-v|cache": {
+    "a": 0.19441876749463552,
+    "p": 2.023267936363705
+   },
+   "wb97m-v|mixed": {
+    "a": 0.07650584082008337,
+    "p": 2.079262100713593
+   },
+   "wb97m-v|stock": {
+    "a": 0.1982089097207195,
+    "p": 2.01791620460456
+   }
+  },
+  "source": {
+   "fork_sha": "63af0568d4fd19935bef51b7fd71f161a9cee56f",
+   "margin": 1.15,
+   "repeats": 3,
+   "rfc_mode": "commission",
+   "run_id": "36951733967-1-0ee605b6",
+   "sha": "0ee605b64285348c2764cb243d4dafa6dfae2e84"
+  }
+ }
+}
