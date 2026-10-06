@@ -290,6 +290,174 @@ class KnownValues(unittest.TestCase):
             self.assertGreater(err, 0)
 
 
+class AOCache(unittest.TestCase):
+    '''The FP64 AO cache: the cached FP64 XC path against stock numint.nr_rks,
+    the cache tiers, and invalidation.'''
+    def _stock_and_state(self, mol, xc, policy=None):
+        mf, _ = run(mol, xc)
+        dm = mf.make_rdm1()
+        mf.mixed_precision = policy or MixedPrecision(xc=True, ao_cache_fp64=True)
+        return mf, dm, mf._numint, mp._SCFState(mf, mf.mixed_precision)
+
+    @staticmethod
+    def _same_bits(a, b):
+        a, b = cupy.asnumpy(a), cupy.asnumpy(b)
+        return a.dtype == b.dtype and a.shape == b.shape and a.tobytes() == b.tobytes()
+
+    def test_fp64_cached_is_bitwise_stock_nr_rks(self):
+        for xc in ('svwn', 'pbe', 'r2scan'):
+            mf, dm, ni, state = self._stock_and_state(mol_p, xc)
+            # tagged density (the SCF iterations) and plain density (the guess)
+            for d in (dm, cupy.asarray(dm.get())):     # .get(): drops the tags
+                n0, e0, v0 = ni.nr_rks(mol_p, mf.grids, xc, d)
+                n0b, e0b, v0b = ni.nr_rks(mol_p, mf.grids, xc, d)
+                # the premise: stock is bitwise reproducible
+                self.assertTrue(n0 == n0b and e0 == e0b and self._same_bits(v0, v0b), xc)
+                res = mp.nr_rks_fp64_cached(state, ni, mol_p, mf.grids, xc, d)
+                self.assertIsNotNone(res, (xc, state.ao_cache_note))
+                n1, e1, v1 = res
+                self.assertEqual(state.ao_cache_tier, 'fp64', xc)
+                self.assertEqual(type(n1), type(n0))
+                self.assertEqual(n1, n0, xc)
+                self.assertEqual(e1, e0, xc)
+                self.assertTrue(self._same_bits(v1, v0), xc)
+            # negative control: the path reads the cache, and the comparison
+            # sees a 1e-12 relative change of every value in the cache
+            for block in state.ao_cache.blocks:
+                block[0] *= 1 + 1e-12
+            n2, e2, v2 = mp.nr_rks_fp64_cached(state, ni, mol_p, mf.grids, xc, dm)
+            n0, e0, v0 = ni.nr_rks(mol_p, mf.grids, xc, dm)
+            self.assertFalse(self._same_bits(v2, v0), xc)
+            self.assertNotEqual(e2, e0, xc)
+
+    def test_cache_is_opt_in(self):
+        self.assertIs(MixedPrecision().ao_cache_fp64, False)
+        mf, _ = run(mol_w, 'r2scan', MixedPrecision(xc=True))
+        r = mf.mixed_precision_record
+        self.assertEqual(r['ao_cache_tier'], 'fp32')
+        self.assertEqual(r['ao_cache_bytes64'], 0)
+        self.assertEqual(r['xc_fp64_cached'], 0)
+        mf, _ = run(mol_w, 'wb97m-v', MixedPrecision(vv10=True))
+        self.assertIsNone(mf.mixed_precision_record['ao_cache_tier'])
+
+    def _on_off(self, mol, xc, policy_kw):
+        mf0, e0 = run(mol, xc, MixedPrecision(ao_cache_fp64=False, **policy_kw))
+        mf1, e1 = run(mol, xc, MixedPrecision(ao_cache_fp64=True, **policy_kw))
+        r0, r1 = mf0.mixed_precision_record, mf1.mixed_precision_record
+        self.assertAlmostEqual(e1, e0, delta=1e-10)
+        self.assertEqual(mf1.cycles, mf0.cycles)
+        self.assertEqual(r1['xc'], r0['xc'])
+        self.assertEqual(r1['k'], r0['k'])
+        self.assertEqual(r0['xc_fp64_cached'], 0)
+        return r0, r1
+
+    def test_cache_on_off_r2scan_and_b3lyp(self):
+        for xc, kw in (('r2scan', {'xc': True}),
+                       ('b3lyp', {'xc': True, 'k': True, 'xc_switch_tol': 3e-4})):
+            r0, r1 = self._on_off(mol_w, xc, kw)
+            self.assertEqual(r0['ao_cache_tier'], 'fp32')
+            self.assertEqual(r1['ao_cache_tier'], 'fp64+fp32')
+            self.assertIn('fp32', r1['xc'])
+            self.assertGreaterEqual(r1['xc_fp64_cached'], 2)
+            self.assertEqual(r1['xc_fp64_stock'], 0)
+            self.assertEqual(r1['xc_path'][-2:], ['fp64-cached', 'fp64-cached'])
+            self.assertEqual(r1['ao_cache_mirror_released_call'], r1['xc_switch_call'])
+            self.assertEqual(r1['ao_cache_bytes64'], 2 * r1['ao_cache_bytes32'])
+            self.assertGreater(r1['ao_cache_bytes32'], 0)
+            # the DF tensor is built before the cache only where get_jk needs it
+            self.assertIs(r1['cderi_prebuilt'], xc == 'b3lyp')
+            self.assertIs(r0['cderi_prebuilt'], False)
+
+    def test_cache_k_only_policy(self):
+        r0, r1 = self._on_off(mol_w, 'b3lyp', {'k': True})
+        self.assertIsNone(r0['ao_cache_tier'])
+        self.assertEqual(r1['ao_cache_tier'], 'fp64')
+        self.assertEqual(r1['xc_path'], ['fp64-cached'] * len(r1['xc']))
+        self.assertIn('fp32', r1['k'])
+        self.assertIs(r1['cderi_prebuilt'], True)
+
+    def test_cache_vv10_only_policy(self):
+        r0, r1 = self._on_off(mol_w, 'wb97m-v', {'vv10': True})
+        self.assertIsNone(r0['ao_cache_tier'])
+        self.assertEqual(r1['ao_cache_tier'], 'fp64')
+        self.assertEqual(r1['xc_path'], ['fp64-cached'] * len(r1['xc']))
+        self.assertEqual(r1['ao_cache_bytes32'], 0)
+        self.assertIsNotNone(r1['vv10_cert'])
+
+    def _patched_free(self, free, xc='r2scan'):
+        orig = mp._free_device_bytes
+        mp._free_device_bytes = lambda: free
+        try:
+            return run(mol_w, xc, MixedPrecision(xc=True, ao_cache_fp64=True))
+        finally:
+            mp._free_device_bytes = orig
+
+    def test_tier_fp32_when_fp64_does_not_fit(self):
+        mf, _ = run(mol_w, 'r2scan', MixedPrecision(xc=True, ao_cache_fp64=True))
+        nvals = mf.mixed_precision_record['ao_cache_bytes32'] // 4
+        self.assertGreater(nvals, 0)
+        # budget = 0.7 * free = 8 bytes per value: the FP32 copy fits, 12 B do not
+        mf1, e1 = self._patched_free(8 * nvals / AO_FRACTION)
+        mf0, e0 = run(mol_w, 'r2scan', MixedPrecision(xc=True, ao_cache_fp64=False))
+        r1 = mf1.mixed_precision_record
+        self.assertEqual(r1['ao_cache_tier'], 'fp32', r1['ao_cache'])
+        self.assertIn('no FP64 copy', r1['ao_cache'])
+        self.assertIn('fp32', r1['xc'])
+        self.assertEqual(r1['xc_fp64_cached'], 0)
+        self.assertEqual(r1['xc_fp64_stock'], r1['xc'].count('fp64'))
+        self.assertEqual(r1['xc'], mf0.mixed_precision_record['xc'])
+        self.assertAlmostEqual(e1, e0, delta=1e-10)
+
+    def test_tier_none_when_nothing_fits(self):
+        mf1, e1 = self._patched_free(1.)
+        mf0, e0 = run(mol_w, 'r2scan')
+        r1 = mf1.mixed_precision_record
+        self.assertIsNone(r1['ao_cache_tier'])
+        self.assertTrue(r1['ao_cache'].startswith('did not fit'), r1['ao_cache'])
+        self.assertTrue(all(p == 'fp64' for p in r1['xc']))
+        self.assertEqual(r1['xc_path'], ['fp64-stock'] * len(r1['xc']))
+        self.assertAlmostEqual(e1, e0, delta=SAME)
+
+    def test_cache_declines_other_grids(self):
+        import copy
+        mf, dm, ni, state = self._stock_and_state(mol_w, 'pbe')
+        self.assertIsNotNone(mp.nr_rks_fp64_cached(state, ni, mol_w, mf.grids, 'pbe', dm))
+        g2 = copy.copy(mf.grids)
+        g2.coords = mf.grids.coords.copy()
+        self.assertIsNone(mp.nr_rks_fp64_cached(state, ni, mol_w, g2, 'pbe', dm))
+        self.assertIsNone(state.ao_cache)
+        self.assertIn('dropped', state.ao_cache_note)
+        self.assertIn('grids.coords', state.ao_cache_note)
+        # dropped for the rest of the SCF, never rebuilt
+        self.assertIsNone(mp.nr_rks_fp64_cached(state, ni, mol_w, mf.grids, 'pbe', dm))
+
+    def test_no_fp64_copy_is_built_for_a_grid_with_an_empty_block(self):
+        # decided from the sparsity index alone: no AO is evaluated (ni=None)
+        class Grids:
+            coords = cupy.zeros((3 * MIN_BLK, 3))
+            def get_non0ao_idx(self, opt):
+                return [(0, cupy.arange(n, dtype=np.int32), None, None, None)
+                        for n in (5, 0, 7)]
+        cache, tier, note = mp._build_ao_cache(None, object(), Grids(), 1, 1e15,
+                                               want64=True, want32=False)
+        self.assertIsNone(cache)
+        self.assertIsNone(tier)
+        self.assertIn('1 empty grid blocks', note)
+        self.assertEqual(mp._predict_ao_values(object(), Grids(), 1), (4 * 12 * MIN_BLK, 1))
+
+    def test_cache_declines_empty_blocks(self):
+        mf, dm, ni, state = self._stock_and_state(mol_w, 'pbe')
+        self.assertIsNotNone(mp.nr_rks_fp64_cached(state, ni, mol_w, mf.grids, 'pbe', dm))
+        state.ao_cache.n_empty = 1
+        self.assertIsNone(mp.nr_rks_fp64_cached(state, ni, mol_w, mf.grids, 'pbe', dm))
+        self.assertIsNone(state.ao_cache)
+        self.assertIn('empty grid blocks', state.ao_cache_note)
+
+
+AO_FRACTION = mp.AO_CACHE_MEM_FRACTION
+MIN_BLK = __import__('gpu4pyscf.dft.numint', fromlist=['MIN_BLK_SIZE']).MIN_BLK_SIZE
+
+
 if __name__ == "__main__":
     print("Tests for opt-in mixed-precision DF-RKS")
     unittest.main()
