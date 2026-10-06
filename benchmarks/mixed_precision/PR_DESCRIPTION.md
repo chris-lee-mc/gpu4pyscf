@@ -28,8 +28,10 @@ in `benchmarks/mixed_precision/native/CLAIMS.md`):
 - measured with the opt-in FP64 AO cache on, an unpruned grid and B3LYP `xc_switch_tol=3e-4`. The
   library defaults and pruned grids were **not** measured, and should give smaller gains.
 
-**Do not enable it on FP64-strong GPUs.** On an H100 and an A100 it made wB97M-V about 2× slower and
-B3LYP up to 1.4× slower. The code does not detect this today (see Limitations).
+**Do not enable it on the FP64-strong GPUs tested.** On an H100 and an A100 it made wB97M-V 1.7–2×
+slower and B3LYP up to 1.4× slower. r2SCAN's 1.32× there came entirely from the FP64 AO cache. The
+code does not detect this today (see Limitations). Other FP64-strong parts and consumer RTX cards
+were not measured.
 
 An earlier external prototype of the same scheme measured r2SCAN 1.78–1.84× (tier geomeans) and
 B3LYP 1.92× (4 molecules, cuTENSOR on both sides); the port's r2SCAN at the prototype's
@@ -107,14 +109,16 @@ two files and touches `numint.py`; it is not in that count.
 ## Limitations and open questions
 
 - **Speed numbers.** They come from this code (`native/`), at the non-default settings listed
-  there. The defaults are not measured. The headline rows rest on single pods for r2SCAN and B3LYP,
-  and same-card pods differ by 10–20 %.
+  there. The defaults are not measured. The headline r2SCAN and B3LYP rows rest on single pods.
+  Healthy same-edition pods agree to about 1–6 %, but readings span 10–20 % once a
+  CONTENTION-UNKNOWN pod or the other edition is included.
 - **FP64-strong GPUs.** The FP32 switch is harmful on the H100 and A100 tested, and nothing in the
   code warns or refuses there. Open question for maintainers: add a device guard (for example by
   compute capability), or document it only? Only two FP64:FP32 levels were measured, so no
   threshold is established.
-- **Cold start.** On Blackwell the first mixed SCF in a process took 64–96 s, against 2–14 s warm.
-  How much of that is the mode's own kernel compilation was not separated.
+- **Cold start.** On a fresh Blackwell pod the first mixed SCF took 64–168 s. Later processes on
+  the same pod did not pay it, which is consistent with a persistent kernel-compilation cache but
+  not established. How much of it belongs to the mode was not separated.
 - **Scope.** The analytic gradient, the Hessian and UKS are out of scope. Range-separated and NLC
   functionals are out of scope for `xc` / `k`; the VV10 component below is the only path that
   treats an NLC functional.
@@ -168,7 +172,7 @@ stock statements run unchanged; positional callers are untouched.
 - Before the df64 tail, the same FP32 phase with a stock FP64 tail gave 1.363× (tol 1e-4) and
   1.592× (tol 1e-5) on celecoxib.
 - Not measured: other functionals or nlcgrids, gradients, open shell. The port's speed on other
-  cards is in `native/` (wB97M-V: L40S 2.99×; H100 0.58× and A100 0.47–0.60×, i.e. slower).
+  cards is in `native/` (wB97M-V: L40S 2.99×; H100 0.58× and A100 0.49–0.60× on clean cells, i.e. slower).
 
 **Files.**
 

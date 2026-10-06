@@ -160,7 +160,7 @@ Sentinels are at `ci-results/runs/rfcbench-3890e545d9cc-<run>-1-3890e545.txt`.
 
 The text above is left as written. These corrections supersede it where they differ; `verify_native.py` checks each corrected number against the data.
 
-- **Part 1:** the gradient prediction (≤ 1e-6 Ha/Bohr) is exceeded in **8** of D1's 12 cells, not 9, and **11** of 12 D1 cells have ρ_g ≤ 3, not 10. C0's downstream cell had been counted in.
+- **Part 1:** the gradient prediction (≤ 1e-6 Ha/Bohr) is exceeded in **8** of D1's 12 cells, not 9: C0's downstream cell had been counted in. Separately, **11** of 12 D1 cells have ρ_g ≤ 3, not 10. That one is a plain miscount, since counting C0's cell (ρ_g 4.09) in would give 11 of 13.
 - **Part 2:** the gradient prediction is a MODEL-MISS in **14** of 18 cells, not 15.
 - **Part 1, "convergence floor".** S′ uses `init_guess='atom'`, not the default guess. What it measures is stock's dependence on the initial guess at these settings. A same-guess comparator was not recorded, and ρ uses a single S′ sample.
 - **Part 1, r2SCAN paracetamol.** Its gradient residual reproduces on two pods: 1.368e-6 on C0 and 1.369e-6 on D1. It is systematic, not noise.

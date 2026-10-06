@@ -169,6 +169,7 @@ def mig_gain(whole, inst, key, arm):
 
 
 TRIO = ("paracetamol", "propranolol", "celecoxib")
+XCS3 = ("r2scan", "b3lyp", "wb97m-v")
 def pod(name):
     hit = [r for r in rows("pods") if r["csv"] == name]
     if len(hit) != 1:
@@ -434,7 +435,13 @@ check_true("N6", "no r2SCAN run builds a DF tensor",
 # --------------------------------------------------------------------------------------------- #
 # N7. Flags, fit tiers, counts and disclosures that the claims rest on
 # --------------------------------------------------------------------------------------------- #
-SPEED_PODS = [r["csv"] for r in rows("pods") if int(r["speed_cells"]) > 0]
+# Derived from the CSVs themselves (pods with speed rows), never from the pods.csv field it checks,
+# and pinned: a pod cannot drop out of these checks by editing its own flags.
+SPEED_PODS = sorted(r["csv"] for r in rows("pods") if any(x["key"].startswith("speed/") for x in rows(r["csv"])))
+check_true("N7", "the 29 speed pods are exactly the expected set",
+           lambda: SPEED_PODS == sorted(["b1", "c0", "c0w", "f0", "f1a", "f1b", "l12", "m0", "m1a", "m1b", "m2a",
+                                         "m2ar", "m2b", "m2br", "w1", "w2", "w3", "w4", "w4r", "w5", "x2a", "x2b",
+                                         "x3", "x4", "x4r", "xl1", "xl2", "xl3a", "xl3b"]))
 
 
 def speed_keys(p):
@@ -503,10 +510,14 @@ check("N7", "M0 (Server Edition) B3LYP trio mixed/stock", gm_ratio("m0", "b3lyp"
 check("N7", "XL r2SCAN geomean without ritonavir (5)", gm_ratio("xl1", "r2scan", mols=LARGE6[:5]), "1.802")
 check("N7", "ritonavir r2SCAN stock warm wall (s)", lambda: med("xl1", cell("ritonavir", "r2scan"), "stock"), "72.2")
 check("N7", "lopinavir r2SCAN stock warm wall (s)", lambda: med("xl1", cell("lopinavir", "r2scan"), "stock"), "50.9")
-check("N7", "A100 wB97M-V mixed/stock, lowest cell (both pods)",
-      lambda: min(ratio(p, k, "mixed", "stock") for p in ("x4", "x4r") for k in keys(p, xc="wb97m-v")), "0.470")
-check("N7", "A100 wB97M-V mixed/stock, highest cell (both pods)",
-      lambda: max(ratio(p, k, "mixed", "stock") for p in ("x4", "x4r") for k in keys(p, xc="wb97m-v")), "0.596")
+check("N7", "A100 wB97M-V mixed/stock, lowest clean cell (both pods)",
+      lambda: min(ratio(p, k, "mixed", "stock") for p in ("x4", "x4r") for k in keys(p, xc="wb97m-v")
+                  if not noisy(p, k)), "0.488")
+check("N7", "A100 wB97M-V mixed/stock, highest clean cell (both pods)",
+      lambda: max(ratio(p, k, "mixed", "stock") for p in ("x4", "x4r") for k in keys(p, xc="wb97m-v")
+                  if not noisy(p, k)), "0.596")
+check("N7", "H100 wB97M-V trio mixed/stock as a slowdown factor (stock/mixed inverted)",
+      lambda: 1 / gm_ratio("x3", "wb97m-v", mols=TRIO)(), "1.73")
 check("N7", "H100 celecoxib wB97M-V mixed/stock", lambda: ratio("x3", cell("celecoxib", "wb97m-v"), "mixed", "stock"),
       "0.521")
 check("N7", "worst B3LYP mixed/stock on H100/A100",
@@ -519,6 +530,89 @@ for p, (m, x, v) in {"x2a": ("paracetamol", "r2scan", "8.6"), "x3": ("paracetamo
     check("N7", f"cold first mixed run (pair 0) in {p}: {m} {x}, seconds",
           lambda p=p, m=m, x=x: one({float(r["wall_s"]) for r in rows(p) if r["key"] == cell(m, x)
                                      and r["arm"] == "mixed" and r["pair"] == "0"}), v)
+
+# Pod status, and CONTENDED exactly when the idle draw before the first group exceeds 200 W
+# (PREREG-0 Amendment 3); C0 predates the telemetry and has neither.
+check_true("N7", "every pod PASSes except D1",
+           lambda: {r["csv"]: r["status"] for r in rows("pods") if r["status"] != "PASS"} == {"d1": "FAIL"})
+check_true("N7", "CONTENDED <=> idle power > 200 W, on every pod but C0; C0 has no reading",
+           lambda: all((r["contended"] == "True") == (float(r["idle_power_w"]) > 200.0)
+                       for r in rows("pods") if r["csv"] != "c0")
+           and (pod("c0")["contended"], pod("c0")["idle_power_w"]) == ("", "")
+           and sorted(r["csv"] for r in rows("pods") if r["contended"] == "True") == ["m2a", "m2b", "w4"])
+
+# Treatment evidence and the accuracy gates, re-derived on every speed and bridge row of every pod.
+POLICY = {
+    ("r2scan", "mixed"): "MixedPrecision(xc=True, k=False, vv10=False, xc_switch_tol=0.001, k_switch_tol=0.001, "
+                         "vv10_switch_tol=1e-05, ao_cache_fp64=True)",
+    ("b3lyp", "mixed"): "MixedPrecision(xc=True, k=True, vv10=False, xc_switch_tol=0.0003, k_switch_tol=0.001, "
+                        "vv10_switch_tol=1e-05, ao_cache_fp64=True)",
+    ("wb97m-v", "mixed"): "MixedPrecision(xc=False, k=False, vv10=True, xc_switch_tol=0.001, k_switch_tol=0.001, "
+                          "vv10_switch_tol=1e-05, ao_cache_fp64=True)",
+}
+for x in XCS3:
+    POLICY[(x, "cache")] = ("MixedPrecision(xc=False, k=False, vv10=False, xc_switch_tol=0.001, k_switch_tol=0.001, "
+                            "vv10_switch_tol=1e-05, ao_cache_fp64=True)")
+    POLICY[(x, "stock")] = ""
+
+
+def tier_expected(p, x, arm):
+    if arm == "stock":
+        return ""
+    if arm == "cache" or x == "wb97m-v":
+        return "fp64"
+    return "fp32" if p in ("f1a", "f1b") else "fp64+fp32"
+
+
+def timed_rows(p):
+    return [r for r in rows(p) if r["key"].split("/")[0] in ("speed", "bridge")]
+
+
+check_true("N7", "every timed row carries the expected policy and cache tier for its functional and arm",
+           lambda: all(r["policy"] == POLICY[(r["key"].split("/")[2], r["arm"])]
+                       and r["ao_cache_tier"] == tier_expected(p, r["key"].split("/")[2], r["arm"])
+                       for p in SPEED_PODS for r in timed_rows(p)))
+
+
+def gate_worst():
+    de, dc, n = 0.0, 0, 0
+    for p in SPEED_PODS:
+        by = {}
+        for r in timed_rows(p):
+            by.setdefault((r["key"], r["pair"]), {})[r["arm"]] = r
+        for arms in by.values():
+            s = arms["stock"]
+            for a, r in arms.items():
+                if a != "stock":
+                    de = max(de, abs(float(r["e"]) - float(s["e"])))
+                    dc = max(dc, abs(int(r["cycles"]) - int(s["cycles"])))
+                    n += 1
+    if not n:
+        raise ValueError("no arm/stock pairs")
+    return de, dc
+
+
+check_true("N7", "accuracy gates on every timed pair: |E_arm - E_stock| <= 1e-8 Ha and |cycles| within 1",
+           lambda: gate_worst()[0] <= 1e-8 and gate_worst()[1] <= 1)
+check("N7", "worst |E_arm - E_stock| over every timed pair (Ha)", lambda: gate_worst()[0], "1.74e-10")
+
+
+# Cold start: the first group of a pod pays it, later groups (fresh processes, same pod) do not.
+def first_cold(p, x):
+    ks = [r["key"] for r in timed_rows(p) if r["key"].split("/")[2] == x]
+    k = ks[0]
+    return one({float(r["wall_s"]) for r in rows(p) if r["key"] == k and r["arm"] == "mixed" and r["pair"] == "0"})
+
+
+check("N7", "cold first mixed SCF, first group, Blackwell whole cards and instances: lowest (s)",
+      lambda: min(first_cold(p, timed_rows(p)[0]["key"].split("/")[2]) for p in SPEED_PODS
+                  if pod(p)["card"].startswith("NVIDIA RTX PRO 6000")), "64.0")
+check("N7", "cold first mixed SCF, first group, Blackwell whole cards and instances: highest (s)",
+      lambda: max(first_cold(p, timed_rows(p)[0]["key"].split("/")[2]) for p in SPEED_PODS
+                  if pod(p)["card"].startswith("NVIDIA RTX PRO 6000")), "167.6")
+for p, x, v in (("c0", "b3lyp", "1.7"), ("c0", "wb97m-v", "15.3"), ("m0", "b3lyp", "1.6"), ("l12", "b3lyp", "1.6")):
+    check("N7", f"cold first mixed SCF in a LATER group of {p} ({x}), seconds",
+          lambda p=p, x=x: first_cold(p, x), v)
 
 # --------------------------------------------------------------------------------------------- #
 # provenance
@@ -558,6 +652,9 @@ def data_integrity():
     return probs
 
 
+EXPECTED_CHECKS = 398   # pinned: a check that silently disappears (or appears) is a FAIL
+
+
 def main():
     integrity = data_integrity()
     for p in integrity:
@@ -586,6 +683,8 @@ def main():
     missing = [k for k in KNOWN_DISCREPANCIES if k not in {(r[0], r[1]) for r in results}]
     bad += [f"known discrepancy never checked: {k}" for k in missing]
     n = len(results)
+    if n != EXPECTED_CHECKS:
+        bad.append(f"ran {n} checks, expected {EXPECTED_CHECKS}")
     print(f"\n{n - len(bad) - len(known)}/{n} checks reproduced; {len(known)} known discrepancies "
           f"(listed above, not adjusted); {len(bad)} failures")
     return 1 if bad or not results else 0

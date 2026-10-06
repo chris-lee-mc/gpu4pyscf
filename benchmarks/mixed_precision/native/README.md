@@ -18,7 +18,7 @@ python verify_native.py      # stdlib only; exit 0 = every quoted number reprodu
 | file | what it is |
 |---|---|
 | `CLAIMS.md` | What the RFC may claim, and what it must not. Includes the measured configuration, negative results, cold start, what can and cannot be verified, and a ledger of every miss, correction and lapse. |
-| `verify_native.py` | Recomputes 385 quoted numbers and facts from `data/` at their printed precision. It fails closed, and a listed known discrepancy must still recompute to its corrected value. |
+| `verify_native.py` | Recomputes 398 quoted numbers and facts from `data/` at their printed precision. It checks `data/SHA256SUMS` first, fails closed, and pins its own check count. A listed known discrepancy must still recompute to its corrected value. |
 | `reproduce_native.py` | Re-measures one speed cell on your GPU with the campaign's settings, cuTENSOR preload and cuTENSOR gate. Transcribed from the harness and dry-run-tested only: see its header. |
 | `SOURCES.md` | Pod, GitHub run, commit, card, contention and noise flags behind every CSV. |
 | `data/*.csv` | Per-run walls, energies, cycles, convergence and cache tiers (one CSV per pod), plus `pods.csv`, `downstream.csv` and `tiers.csv`. |
@@ -32,7 +32,8 @@ python verify_native.py      # stdlib only; exit 0 = every quoted number reprodu
 - **CONTENDED and DEGRADED pods** are reported separately and never pooled.
   - CONTENDED means another load was on the GPU; DEGRADED means too many NOISY cells.
   - The CONTENDED rule (PREREG-0 Amendment 3) was written **after** its first case (W4) had been
-    seen, and it has so far replaced only low readings.
+    seen. On whole cards it replaced only low readings (C0, W4); on MIG it replaced two pods whose
+    MIG gains were higher than their re-runs'.
 
 **Limits on verification.**
 - The sentinels, the measuring harness and the protocol history live in a private repository.

@@ -261,6 +261,6 @@ whole card", as §"Pods" stated. The two runner failures cost nothing.
 
 The text above is left as written. These corrections supersede it where they differ; `verify_native.py` checks each corrected number against the data.
 
-- **Dates.** "Status 2026-10-06", "Owner decision of 2026-10-06" and the RESULT heading's 2026-10-06 should all read **2026-10-05**, when this file and its RESULT were committed.
+- **Dates.** "Status 2026-10-06" and "Owner decision of 2026-10-06" should read **2026-10-05**, when this file was committed (`13cc3011`). The RESULT heading's 2026-10-06 is correct: the RESULT was committed at 2026-10-06 00:03 UTC (`b0ee3b03`), after F1b ended.
 - **Atorvastatin B3LYP stock MIG gain** is **1.10** (1.0950), not 1.09. That appears in the MIG-gain table and in "the falsifier … B3LYP 1.09 NEUTRAL". The reading stays NEUTRAL, so the falsifier verdict is unchanged.
 - **Baseline.** As in PREREG-5: F0 ran one SCF at a time, and it is a single pod.

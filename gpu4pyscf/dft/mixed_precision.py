@@ -68,9 +68,10 @@ raises NotImplementedError when the SCF starts; a VV10 kernel that does not
 build or fails its probe raises RuntimeError. Nothing falls back silently.
 
 This is an opt-in performance mode for FP64-limited GPUs. Do not enable it on
-FP64-strong GPUs: on an H100 and an A100 it was measured about 2x slower for
-wB97M-V and up to 1.4x slower for B3LYP (r2SCAN about neutral). Nothing here
-detects the device; see benchmarks/mixed_precision/native/CLAIMS.md.
+FP64-strong GPUs: on an H100 and an A100 it was measured 1.7-2x slower for
+wB97M-V and up to 1.4x slower for B3LYP; r2SCAN's gain there came only from the
+FP64 AO cache. Nothing here detects the device; see
+benchmarks/mixed_precision/native/CLAIMS.md.
 
 Usage::
 

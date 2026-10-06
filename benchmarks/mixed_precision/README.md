@@ -21,18 +21,25 @@ from gpu4pyscf.dft.mixed_precision import MixedPrecision
 
 mf = gpu4pyscf.dft.RKS(mol, xc='b3lyp').density_fit()
 mf.mixed_precision = MixedPrecision(xc=True, k=True)   # default: None, i.e. stock
+# The speed numbers in native/ were measured with, in addition, ao_cache_fp64=True,
+# xc_switch_tol=3e-4 for B3LYP, mf.grids.prune = None and cuTENSOR. The line above
+# (library defaults, pruned grid) is NOT measured; expect a smaller gain.
 mf.kernel()
 print(mf.mixed_precision_record)   # the precision of each iteration, and why it switched
 ```
 
-- **Who it is for.** GPUs whose FP64 throughput is a small fraction of FP32, such as RTX and
-  workstation Blackwell cards.
-- **Do not enable it on FP64-strong data-centre GPUs.** On the H100 and A100 tested, it made
-  wB97M-V about 2× slower and B3LYP up to 1.4× slower; r2SCAN was neutral
-  ([`native/CLAIMS.md`](native/CLAIMS.md) C3). The code does **not** detect this: nothing warns or
-  refuses on such a device. Only two levels of FP64:FP32 throughput were measured, so no threshold
-  is established. On those cards the FP64 AO cache alone (`MixedPrecision(ao_cache_fp64=True)`)
-  pays about 1.15–1.25× for r2SCAN and B3LYP, and is neutral for wB97M-V.
+- **Who it is for.** GPUs whose FP64 throughput is a small fraction of FP32. Measured on the RTX
+  PRO 6000 Blackwell (Workstation and Server) and the L40S; consumer RTX cards (e.g. the 5090) were
+  not measured.
+- **Do not enable it on the FP64-strong data-centre GPUs tested.** On the H100 and A100 it made
+  wB97M-V 1.7–2× slower and B3LYP up to 1.4× slower. r2SCAN still gained 1.32× on the H100, but all
+  of that came from the FP64 AO cache; the FP32 switch itself was neutral (1.08)
+  ([`native/CLAIMS.md`](native/CLAIMS.md) C3).
+  - Other FP64-strong parts (e.g. B200, V100) were not measured.
+  - The code does **not** detect any of this: nothing warns or refuses on such a device.
+  - Only two levels of FP64:FP32 throughput were measured, so no threshold is established.
+  - On those cards the FP64 AO cache alone (`MixedPrecision(ao_cache_fp64=True)`) pays about
+    1.15–1.25× for r2SCAN and B3LYP, and is neutral for wB97M-V.
 - **Opt-in only.** It is off unless `mf.mixed_precision` is set. With it unset, nothing changes.
 - **What runs in FP32.**
   - XC: the density and XC-potential contractions, against an FP32 copy of the AO values that is
