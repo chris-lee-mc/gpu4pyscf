@@ -1,0 +1,9 @@
+run_id,key,pair,run,arm,wall_s,e,cycles,converged,ngrids,naux,nao,policy,ao_cache_tier,xc,k,vv10,fp64_tail,ao_cache_bytes64,ao_cache_bytes32,error
+37057939484-1-3890e545,speed/atorvastatin/wb97m-v/mtzvpp,0,,mixed,167.5556,-1864.0580177603533,13,True,1457152,3721,994,"MixedPrecision(xc=False, k=False, vv10=True, xc_switch_tol=0.001, k_switch_tol=0.001, vv10_switch_tol=1e-05, ao_cache_fp64=True)",fp64,fp64*14,fp64*14,"fp32*9,df64*5",True,17320050688,0,
+37057939484-1-3890e545,speed/atorvastatin/wb97m-v/mtzvpp,0,,stock,291.4544,-1864.0580177603542,13,True,1457152,3721,994,,,,,,,,,
+37057939484-1-3890e545,speed/atorvastatin/wb97m-v/mtzvpp,1,,mixed,107.5685,-1864.0580177603524,13,True,1457152,3721,994,"MixedPrecision(xc=False, k=False, vv10=True, xc_switch_tol=0.001, k_switch_tol=0.001, vv10_switch_tol=1e-05, ao_cache_fp64=True)",fp64,fp64*14,fp64*14,"fp32*9,df64*5",True,17320050688,0,
+37057939484-1-3890e545,speed/atorvastatin/wb97m-v/mtzvpp,1,,stock,291.4323,-1864.0580177603524,13,True,1457152,3721,994,,,,,,,,,
+37057939484-1-3890e545,speed/atorvastatin/wb97m-v/mtzvpp,2,,mixed,107.6328,-1864.0580177603551,13,True,1457152,3721,994,"MixedPrecision(xc=False, k=False, vv10=True, xc_switch_tol=0.001, k_switch_tol=0.001, vv10_switch_tol=1e-05, ao_cache_fp64=True)",fp64,fp64*14,fp64*14,"fp32*9,df64*5",True,17319657472,0,
+37057939484-1-3890e545,speed/atorvastatin/wb97m-v/mtzvpp,2,,stock,291.4125,-1864.0580177603533,13,True,1457152,3721,994,,,,,,,,,
+37057939484-1-3890e545,speed/atorvastatin/wb97m-v/mtzvpp,3,,mixed,107.5787,-1864.0580177603533,13,True,1457152,3721,994,"MixedPrecision(xc=False, k=False, vv10=True, xc_switch_tol=0.001, k_switch_tol=0.001, vv10_switch_tol=1e-05, ao_cache_fp64=True)",fp64,fp64*14,fp64*14,"fp32*9,df64*5",True,17319657472,0,
+37057939484-1-3890e545,speed/atorvastatin/wb97m-v/mtzvpp,3,,stock,291.4218,-1864.0580177603524,13,True,1457152,3721,994,,,,,,,,,

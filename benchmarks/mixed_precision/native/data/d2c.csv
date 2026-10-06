@@ -1,0 +1,5 @@
+run_id,key,pair,run,arm,wall_s,e,cycles,converged,ngrids,naux,nao,policy,ao_cache_tier,xc,k,vv10,fp64_tail,ao_cache_bytes64,ao_cache_bytes32,error
+37043596852-1-3890e545,downstream/omeprazole/wb97m-v/mtzvpp,,R,,181.7524,-1447.2612624766825,17,True,842752,2207,589,,,,,,,,,
+37043596852-1-3890e545,downstream/omeprazole/wb97m-v/mtzvpp,,S,,103.7165,-1447.2612624765816,14,True,842752,2207,589,,,,,,,,,
+37043596852-1-3890e545,downstream/omeprazole/wb97m-v/mtzvpp,,Sp,,110.6406,-1447.2612624766507,15,True,842752,2207,589,,,,,,,,,
+37043596852-1-3890e545,downstream/omeprazole/wb97m-v/mtzvpp,,M,,35.1217,-1447.2612624765802,14,True,842752,2207,589,"MixedPrecision(xc=False, k=False, vv10=True, xc_switch_tol=0.001, k_switch_tol=0.001, vv10_switch_tol=1e-05, ao_cache_fp64=True)",fp64,fp64*15,fp64*15,"fp32*8,df64*7",True,7309295616,0,

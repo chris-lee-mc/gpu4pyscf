@@ -535,7 +535,36 @@ check_true("P", "every speed CSV row carries its pod's RUN_ID",
            lambda: all({r["run_id"] for r in rows(p["csv"])} == {p["run_id"]} for p in rows("pods")))
 
 
+def data_integrity():
+    """Every file in data/ must be listed in data/SHA256SUMS with a matching hash, and every listed
+    file must exist: a missing, extra or edited data file is a FAIL before any number is read."""
+    import hashlib
+    path = os.path.join(DATA, "SHA256SUMS")
+    if not os.path.isfile(path):
+        return [f"missing {path}"]
+    want = {}
+    with open(path) as fh:
+        for ln in fh:
+            h, name = ln.split()
+            want[name] = h
+    have = sorted(f for f in os.listdir(DATA) if f != "SHA256SUMS")
+    probs = [f"not in SHA256SUMS: {f}" for f in have if f not in want]
+    probs += [f"listed but missing: {f}" for f in want if f not in have]
+    for f in have:
+        if f in want:
+            with open(os.path.join(DATA, f), "rb") as fh:
+                if hashlib.sha256(fh.read()).hexdigest() != want[f]:
+                    probs.append(f"hash mismatch: {f}")
+    return probs
+
+
 def main():
+    integrity = data_integrity()
+    for p in integrity:
+        print(f"FAIL data  {p}")
+    if integrity:
+        print("\ndata/ does not match data/SHA256SUMS: no number was checked")
+        return 1
     bad, known = [], []
     width = max(len(r[1]) for r in results)
     for claim, what, got, banked, ok in results:

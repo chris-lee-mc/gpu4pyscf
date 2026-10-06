@@ -1,0 +1,9 @@
+run_id,key,pair,run,arm,wall_s,e,cycles,converged,ngrids,naux,nao,policy,ao_cache_tier,xc,k,vv10,fp64_tail,ao_cache_bytes64,ao_cache_bytes32,error
+37055501906-1-3890e545,speed/sildenafil/wb97m-v/mtzvpp,0,,mixed,130.3303,-1883.8799143647302,13,True,1212672,3088,835,"MixedPrecision(xc=False, k=False, vv10=True, xc_switch_tol=0.001, k_switch_tol=0.001, vv10_switch_tol=1e-05, ao_cache_fp64=True)",fp64,fp64*14,fp64*14,"fp32*8,df64*6",True,13082591232,0,
+37055501906-1-3890e545,speed/sildenafil/wb97m-v/mtzvpp,0,,stock,201.3973,-1883.8799143647311,13,True,1212672,3088,835,,,,,,,,,
+37055501906-1-3890e545,speed/sildenafil/wb97m-v/mtzvpp,1,,mixed,71.7838,-1883.8799143647302,13,True,1212672,3088,835,"MixedPrecision(xc=False, k=False, vv10=True, xc_switch_tol=0.001, k_switch_tol=0.001, vv10_switch_tol=1e-05, ao_cache_fp64=True)",fp64,fp64*14,fp64*14,"fp32*8,df64*6",True,13081804800,0,
+37055501906-1-3890e545,speed/sildenafil/wb97m-v/mtzvpp,1,,stock,201.0301,-1883.8799143647311,13,True,1212672,3088,835,,,,,,,,,
+37055501906-1-3890e545,speed/sildenafil/wb97m-v/mtzvpp,2,,mixed,71.8219,-1883.8799143647293,13,True,1212672,3088,835,"MixedPrecision(xc=False, k=False, vv10=True, xc_switch_tol=0.001, k_switch_tol=0.001, vv10_switch_tol=1e-05, ao_cache_fp64=True)",fp64,fp64*14,fp64*14,"fp32*8,df64*6",True,13081804800,0,
+37055501906-1-3890e545,speed/sildenafil/wb97m-v/mtzvpp,2,,stock,202.0698,-1883.8799143647302,13,True,1212672,3088,835,,,,,,,,,
+37055501906-1-3890e545,speed/sildenafil/wb97m-v/mtzvpp,3,,mixed,71.8602,-1883.879914364732,13,True,1212672,3088,835,"MixedPrecision(xc=False, k=False, vv10=True, xc_switch_tol=0.001, k_switch_tol=0.001, vv10_switch_tol=1e-05, ao_cache_fp64=True)",fp64,fp64*14,fp64*14,"fp32*8,df64*6",True,13082460160,0,
+37055501906-1-3890e545,speed/sildenafil/wb97m-v/mtzvpp,3,,stock,203.1304,-1883.8799143647311,13,True,1212672,3088,835,,,,,,,,,
