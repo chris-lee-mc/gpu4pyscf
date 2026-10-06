@@ -67,8 +67,10 @@ the non-DF path are allowed. Anything else
 raises NotImplementedError when the SCF starts; a VV10 kernel that does not
 build or fails its probe raises RuntimeError. Nothing falls back silently.
 
-This is an opt-in performance mode. On FP64-strong GPUs (e.g. H100, A100) it
-may not pay off.
+This is an opt-in performance mode for GPUs whose FP64 throughput is a small
+fraction of FP32. Do not enable it on FP64-strong GPUs: on an H100 and an A100
+it was measured about 1.7-2x slower for wB97M-V and up to 1.4x slower for
+B3LYP. Nothing here detects the device.
 
 Usage::
 
