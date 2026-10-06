@@ -355,7 +355,24 @@ class _DFHF:
 
             elif isinstance(self, hf.RHF):
                 rks.initialize_grids(self, mol, dm)
-                n, exc, vxc = ni.nr_rks(mol, self.grids, self.xc, dm)
+                # Opt-in mixed precision (gpu4pyscf.dft.mixed_precision). This
+                # path builds J/K from the full density every iteration, so no
+                # FP32 K contribution can outlive the FP32 phase.
+                mp_state = getattr(self, '_mixed_precision_state', None)
+                k_prec = 'fp64'
+                res = None
+                if mp_state is not None:
+                    xc_prec, k_prec, _ = mp_state.begin_call()
+                    if xc_prec == 'fp32':
+                        from gpu4pyscf.dft import mixed_precision
+                        res = mixed_precision.nr_rks_fp32(
+                            mp_state, ni, mol, self.grids, self.xc, dm)
+                        if res is None:     # FP32 AO copy did not fit
+                            mp_state._cur['xc'] = 'fp64'
+                if res is None:
+                    res = ni.nr_rks(mol, self.grids, self.xc, dm)
+                n, exc, vxc = res
+                exc_xc = exc
                 log.debug('nelec by numeric integration = %s', n)
                 if self.do_nlc():
                     if ni.libxc.is_nlc(self.xc):
@@ -388,6 +405,10 @@ class _DFHF:
                             vk = self.get_k(mol, dm, hermi, omega=omega, lr_factor=alpha, sr_factor=hyb)
                         else:
                             raise ValueError(f'range_separated_mode = {range_separated_mode} is not supported')
+                    elif mp_state is not None: # omega == 0
+                        with mp_state.k_scope(self.with_df, k_prec):
+                            vj, vk = self.get_jk(mol, dm, hermi)
+                        vk *= hyb
                     else: # omega == 0
                         vj, vk = self.get_jk(mol, dm, hermi)
                         vk *= hyb
@@ -395,6 +416,8 @@ class _DFHF:
                     vxc -= vk * .5
                     exc -= float(cupy.einsum('ij,ji->', dm, vk).real.get()) * .25
                 ecoul = float(cupy.einsum('ij,ji->', dm, vj).real.get()) * .5
+                if mp_state is not None:
+                    mp_state.end_call(exc_xc)
             elif isinstance(self, ghf.GHF):
                 if hermi == 2:  # because rho = 0
                     n, exc, vxc = 0, 0, 0
@@ -493,6 +516,30 @@ class _DFHF:
             obj.spin_samples = self.spin_samples
         return obj
 
+def _k_block_fp32(cderi, factor, buf, vk_out, chunk_mem_fraction=0.25):
+    '''vk_out += contract('nikL,njkL->nij', rhok, rhok) with
+    rhok = contract('Lij,njk->nikL', cderi, factor), both contractions in FP32.
+
+    rhok is written in FP32 into the memory of the FP64 buffer buf, and cderi
+    is cast to FP32 in aux-index chunks sized from free memory. The FP32
+    result is promoted before it is added into the FP64 vk_out.'''
+    nL, nao = cderi.shape[:2]
+    n, _, nocc = factor.shape
+    rhok32 = cupy.ndarray((n, nao, nocc, nL), dtype=numpy.float32, memptr=buf.data)
+    f32 = factor.astype(numpy.float32)
+    row_bytes = 4 * nao * nao
+    chunk = int(chunk_mem_fraction * get_avail_mem() // row_bytes)
+    chunk = max(1, min(nL, chunk))
+    for l0, l1 in lib.prange(0, nL, chunk):
+        c32 = cderi[l0:l1].astype(numpy.float32)
+        if l0 == 0 and l1 == nL:
+            contract('Lij,njk->nikL', c32, f32, out=rhok32)
+        else:
+            rhok32[..., l0:l1] = contract('Lij,njk->nikL', c32, f32)
+        c32 = None
+    vk_out += contract('nikL,njkL->nij', rhok32, rhok32)
+    return vk_out
+
 def get_jk(dfobj, dms, hermi=0, with_j=True, with_k=True,
            omega=None, lr_factor=None, sr_factor=None):
     '''
@@ -513,6 +560,15 @@ def get_jk(dfobj, dms, hermi=0, with_j=True, with_k=True,
     if dm_factor_l.ndim == 4: # for UHF-TDDFT and UHF-hessian
         assert dms.ndim == 4
         nspin = 2
+
+    # Opt-in FP32 exchange, requested per call by gpu4pyscf.dft.mixed_precision
+    # through dfobj._k_precision. Only the plain (mode 0, omega=0) K is
+    # served; every other case is the FP64 path below.
+    k_fp32 = (with_k and getattr(dfobj, '_k_precision', None) == 'fp32'
+              and dm_factor_r is None and not omega
+              and lr_factor is None and sr_factor is None)
+    if k_fp32:
+        dfobj._k_precision_applied = getattr(dfobj, '_k_precision_applied', 0) + 1
 
     if dm_factor_r is None:
         dm_factor_mode = 0
@@ -579,7 +635,14 @@ def get_jk(dfobj, dms, hermi=0, with_j=True, with_k=True,
             if with_k:
                 nL = len(cderi)
                 for s in range(nspin):
-                    if dm_factor_mode == 0:
+                    if dm_factor_mode == 0 and k_fp32:
+                        # Opt-in FP32 exchange (gpu4pyscf.dft.mixed_precision).
+                        # The FP32 half-transform reuses the FP64 rhok buffer;
+                        # the vk accumulator stays FP64.
+                        for i0, i1 in lib.prange(0, n_dm, dm_batch_size):
+                            _k_block_fp32(cderi, factor_l[s,i0:i1], buf,
+                                          vk[s,i0:i1])
+                    elif dm_factor_mode == 0:
                         for i0, i1 in lib.prange(0, n_dm, dm_batch_size):
                             rhok = ndarray((i1-i0,nao,nocc,nL), buffer=buf)
                             contract('Lij,njk->nikL', cderi, factor_l[s,i0:i1], out=rhok)
