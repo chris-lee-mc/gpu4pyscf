@@ -394,3 +394,55 @@ None of these changes an outcome. All five CS1 thresholds still hold, and 0.115 
   call, which builds no tensor and takes about 0.05 s, varies by up to 9 % (≤ 5 ms).
 - On the CONTENDED ST2, celecoxib's DF build is 4.8 % faster in the mixed and cache arms than in
   stock.
+
+### Erratum 2 (2026-10-07, from the independent review of the fork package, before merge)
+
+No outcome of a pre-registered decision changes: the CS1 thresholds, the X3r falsifier and the CC1
+decision rule all reproduce. What changes is how some of the RESULT reads.
+
+- **L12r: replication is not testable as pre-registered.**
+  - PREREG-0 §3 makes a DEGRADED pod's aggregates unquotable. The RESULT nonetheless evaluated the
+    falsifier on L12r's and L12r2's all-24 geomeans, and softened the rule to "not quoted alone".
+    That was a reinterpretation.
+  - The correct reading:
+    - the pre-registered test cannot be run;
+    - the all-24 geomeans are UNQUOTABLE;
+    - a **post-hoc** comparison restricted to the same clean cells of L12 is consistent with it.
+  - Same-cell differences:
+    - r2SCAN: +0.057 and +0.062 on each pod's own clean cells; +0.049 and +0.060 on cells clean on
+      both;
+    - B3LYP: +0.074 and +0.086; and +0.072 and +0.059.
+  - "The ladder replicates" is withdrawn.
+  - The headline sentence "both replications hold on their geomeans" is also wrong: the X3r
+    falsifier fired on a geomean.
+- **L12r per-cell spans.** The spans quoted (1.55–2.02 and 1.26–2.13) include NOISY cells. On clean
+  cells they are 1.57–2.02 (r2SCAN) and 1.56–2.10 (B3LYP).
+- **L12r bridge legs.** These were not reported: 1.643 (L12r) and 1.658 (L12r2), against L12's
+  1.586.
+- **X3r: the mechanism was misattributed.** "The cache tier is what moves between pods" is wrong.
+  - X3r was a slower pod: every median wall is 4–34 % above X3's, and stock slowed the most.
+  - By functional, the slowdown is 1.25 / 1.25 / 1.12 for stock, against 1.18 / 1.14 / 1.10 for
+    cache and 1.18 / 1.11 / 1.06 for mixed.
+  - So every ratio over stock rose, and mixed/cache barely moved.
+- **ST1: the causal sentence is withdrawn.** "The K path is what limits B3LYP at size" affirmed the
+  consequent of the falsifier.
+  - Holding celecoxib's stage ratios fixed and moving only the stage shares (untimed remainder held
+    unaccelerated) explains about 19 % (sildenafil) and 37 % (atorvastatin) of the drop in
+    whole-SCF stock/mixed.
+  - The rest is unexplained. The FP32 J/K speedup is not monotonic (0.95, 1.50, 1.05, 1.07), and at
+    sildenafil the XC switch came early (8 FP32 iterations against 10–11).
+  - The J/K stage includes J, which is always FP64. K ran in FP32 for only 8–9 of 13–15 calls.
+- **Cold start: the mechanism was stated beyond the data.**
+  - CS1 establishes the driver JIT cache. It does not establish whose PTX is compiled, and that a
+    `120-real` wheel would remove the cost is untested.
+  - The cost is charged to the first SCF against an empty cache, not to whichever functional runs
+    first in a process: in P2 and P3 the first functional paid ≤ 1.86 s.
+  - Persisting the driver cache alone would leave about 10 s (P4).
+- **CC1 caveats not stated.**
+  - It is one pod.
+  - Freeing the memory pool after every SCF makes T_S 2.1 % (stock) and 6.2 % (mixed) slower than
+    M0's summed warm walls for the same cells, which inflates G by about that much.
+  - "Beats MIG" means it beats the four-slice *projection*.
+- **Small corrections:**
+  - "X3r idled higher than any Blackwell pod here" is wrong: ST2 idled at 241 W.
+  - The stock-vs-stock floor is 3.2e-12 Ha when CC1 is pooled across its phases, not ≤ 2.8e-12.

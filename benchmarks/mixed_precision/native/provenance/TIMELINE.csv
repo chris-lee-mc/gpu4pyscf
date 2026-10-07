@@ -121,3 +121,4 @@ time_utc,kind,what,ref,detail
 2026-10-07T12:48:11Z,run finished,st2r,37621705258,success
 2026-10-07T12:49:48Z,protocol commit,PREREG-rfcbench-7-coldstart-stages-concurrency.md,d82ad1149144,"PREREG-7 RESULT: cold start is driver JIT; L12 replicates; H100 B3LYP range; FP32 K buys little at size; MPS beats MIG, C5 dropped; bank ST2r CSV"
 2026-10-07T12:56:20Z,protocol commit,PREREG-rfcbench-7-coldstart-stages-concurrency.md,222143e24afe,"PREREG-7: erratum to the RESULT (rounded-reading arithmetic), found by the fork verifier"
+2026-10-07T13:23:41Z,protocol commit,PREREG-rfcbench-7-coldstart-stages-concurrency.md,69eea8fe2862,PREREG-7: erratum 2 from the independent review (DEGRADED replication not testable as registered; X3r mechanism; ST1 and cold-start causal claims withdrawn; CC1 caveats)

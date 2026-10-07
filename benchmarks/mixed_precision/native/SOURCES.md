@@ -2,7 +2,8 @@
 
 Every CSV in `data/` was extracted from one pod's result sentinel, on the `ci-bus` branch of
 `chris-lee-mc/gpu-conformer-engine`. The extractor was `.github/scripts/rfcbench_extract.py`
-(`--run-id <RUN_ID> --csv`), at the commit that merged each RESULT. A sentinel's line 2 is
+(`--run-id <RUN_ID> --csv`), at the commit that merged each RESULT (for PREREG-7, whose RESULT
+is not yet merged, at `d05888b8`; the extractor is byte-identical on the RESULT's branch). A sentinel's line 2 is
 `RUN_ID=<RUN_ID>`, and each CSV row carries the same `run_id`; `verify_native.py` checks that
 against `data/pods.csv`.
 

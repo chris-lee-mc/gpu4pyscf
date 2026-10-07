@@ -538,7 +538,7 @@ check("N7", "H100 wB97M-V trio mixed/stock as a slowdown factor (stock/mixed inv
 check("N7", "H100 celecoxib wB97M-V mixed/stock", lambda: ratio("x3", cell("celecoxib", "wb97m-v"), "mixed", "stock"),
       "0.521")
 check("N7", "worst B3LYP mixed/stock on H100/A100",
-      lambda: min(ratio(p, k, "mixed", "stock") for p in ("x3", "x4", "x4r") for k in keys(p, xc="b3lyp")), "0.711")
+      lambda: min(ratio(p, k, "mixed", "stock") for p in ("x3", "x3r", "x4", "x4r") for k in keys(p, xc="b3lyp")), "0.711")
 check("N7", "C0 vs D1: r2SCAN paracetamol gradient residual on C0",
       lambda: ds("c0", "paracetamol", "r2scan", "max_dg"), "1.368e-6")
 check("N7", "C0 vs D1: r2SCAN paracetamol gradient residual on D1",
@@ -875,9 +875,9 @@ check("N8", "ST1 sildenafil B3LYP: cache XC (s)", lambda: stage("st1", "sildenaf
 check("N8", "ST1 sildenafil B3LYP: stock XC (s)", lambda: stage("st1", "sildenafil", "b3lyp", "stock", "xc_s"), "10.319")
 for m, v in (("celecoxib", "1.08"), ("sildenafil", "1.16")):
     check("N8", f"ST2 (CONTENDED) {m} B3LYP: J/K stock/mixed", st_ratio("st2", m, "b3lyp", "jk_s"), v)
-check_true("N8", "ST1, ST2, ST2r: DF build and eigensolver within 5 % (or 10 ms) of stock in every pair-1 cell",
+check_true("N8", "ST1, ST2, ST2r: DF build and eigensolver within 5 % (or 5 ms) of stock in every pair-1 cell",
            lambda: all(abs(stage(p, m, x, a, st) / stage(p, m, x, "stock", st) - 1) <= 0.05
-                       or abs(stage(p, m, x, a, st) - stage(p, m, x, "stock", st)) <= 0.010
+                       or abs(stage(p, m, x, a, st) - stage(p, m, x, "stock", st)) <= 0.005
                        for (p, m, x) in list(ST) + [("st2", "celecoxib", "b3lyp"), ("st2", "sildenafil", "b3lyp")]
                        for a in ("mixed", "cache") for st in ("dfbuild_s", "eig_s")))
 check_true("N8", "ST1, ST2r: 'other' (wall minus timed stages) is <= 6 % of every stock SCF",
@@ -950,6 +950,174 @@ check("N8", "CS1: largest cold extra of a functional that did not run first (s)"
       lambda: max(cold_extra(ph, x)() for ph in CS1 for x in ("b3lyp", "wb97m-v")), "1.62")
 
 
+# Review follow-ups (2026-10-07): every figure CLAIMS.md added or corrected after the independent review.
+def gm_same(ref, p, x, pods):
+    ks = [k for k in keys(p, xc=x) if not any(noisy(q, k) for q in pods)]
+    return geomean(ratio(ref, k, "mixed", "stock") for k in ks)
+
+
+for p, x, v in (("l12r", "r2scan", "1.660"), ("l12r2", "r2scan", "1.671"), ("l12r", "b3lyp", "1.799"),
+                ("l12r2", "b3lyp", "1.787")):
+    check("N8", f"L12 restricted to {p}'s clean {x} cells (like-for-like)", lambda p=p, x=x: gm_same("l12", p, x, (p,)), v)
+for x, v in (("r2scan", "1.660"), ("b3lyp", "1.759")):
+    check("N8", f"L12 restricted to the {x} cells clean on both replicates", lambda x=x: gm_same("l12", "l12r", x, L12R), v)
+for x, lo, hi in (("r2scan", "1.57", "2.02"), ("b3lyp", "1.56", "2.10")):
+    cl = lambda x=x: [ratio(p, k, "mixed", "stock") for p in L12R for k in keys(p, xc=x) if not noisy(p, k)]
+    check("N8", f"L12r/L12r2 clean {x} cells: lowest mixed/stock", lambda cl=cl: min(cl()), lo)
+    check("N8", f"L12r/L12r2 clean {x} cells: highest mixed/stock", lambda cl=cl: max(cl()), hi)
+for p, v in (("l12r", "1.643"), ("l12r2", "1.658")):
+    check("N8", f"{p} bridge leg r2SCAN geomean (R = 1, conv_tol_grad 1e-5)", gm_ratio(p, "r2scan", kind="bridge"), v)
+
+
+def noisy_arms(p, arm):
+    return sum(1 for k in speed_keys(p) if any(r["key"] == k and r["arm"] == arm for r in rows(p))
+               and spread(p, k, arm) > 0.10)
+
+
+check_true("N8", "NOISY arms: L12r 16 mixed / 7 stock, L12r2 12 mixed / 10 stock, no cache arm",
+           lambda: [(noisy_arms(p, "mixed"), noisy_arms(p, "stock"), noisy_arms(p, "cache")) for p in L12R]
+           == [(16, 7, 0), (12, 10, 0)])
+for a, vals in (("stock", ("1.25", "1.25", "1.12")), ("cache", ("1.18", "1.14", "1.10")),
+                ("mixed", ("1.18", "1.11", "1.06"))):
+    for x, v in zip(XCS3, vals):
+        check("N8", f"X3r/X3 median wall, {a} {x}, trio geomean",
+              lambda a=a, x=x: geomean(med("x3r", cell(m, x), a) / med("x3", cell(m, x), a) for m in TRIO), v)
+_x3w = lambda: [med("x3r", cell(m, x), a) / med("x3", cell(m, x), a) for m in TRIO for x in XCS3
+                for a in ("stock", "cache", "mixed")]
+check("N8", "X3r/X3 median wall, lowest of 27 arm-cells", lambda: min(_x3w()), "1.04")
+check("N8", "X3r/X3 median wall, highest of 27 arm-cells", lambda: max(_x3w()), "1.34")
+check_true("N8", "X3r: stock slowed the most in every one of the 9 cells",
+           lambda: all(med("x3r", cell(m, x), "stock") / med("x3", cell(m, x), "stock")
+                       >= max(med("x3r", cell(m, x), a) / med("x3", cell(m, x), a) for a in ("cache", "mixed"))
+                       for m in TRIO for x in XCS3))
+_cache_rb = lambda: ([gm_ratio(p, x, "cache", "stock", mols=TRIO)() for p in ("x3", "x3r") for x in ("r2scan", "b3lyp")]
+                     + [ratio(p, cell(m, x), "cache", "stock") for (p, m, x) in A100_CLEAN if x != "wb97m-v"])
+check("N8", "cache alone, r2SCAN/B3LYP on H100 trios and clean A100 cells: lowest", lambda: min(_cache_rb()), "1.15")
+check("N8", "cache alone, r2SCAN/B3LYP on H100 trios and clean A100 cells: highest", lambda: max(_cache_rb()), "1.34")
+
+
+def whole(p, m, x):
+    return xone(p, "wall_s", mol=m, xc=x, arm="stock", pair="1") / xone(p, "wall_s", mol=m, xc=x, arm="mixed", pair="1")
+
+
+def fixed_ratio(m, ref="celecoxib"):
+    """Whole-SCF stock/mixed if molecule m kept its stock stage shares but had ref's stage ratios.
+    The untimed remainder ("other") is held unaccelerated (ratio 1)."""
+    sts = ("xc_s", "jk_s", "dfbuild_s", "eig_s")
+    w = xone("st1", "wall_s", mol=m, xc="b3lyp", arm="stock", pair="1")
+    sh = {st: stage("st1", m, "b3lyp", "stock", st) / w for st in sts}
+    other = 1 - sum(sh.values())
+    rr = {st: st_ratio("st1", ref, "b3lyp", st)() for st in sts}
+    return 1 / (sum(sh[st] / rr[st] for st in sts) + other)
+
+
+for m, v in (("celecoxib", "1.854"), ("sildenafil", "1.288"), ("atorvastatin", "1.360")):
+    check("N8", f"ST1 {m} B3LYP whole-SCF stock/mixed (pair 1)", lambda m=m: whole("st1", m, "b3lyp"), v)
+for m, v, f in (("sildenafil", "1.748", "19"), ("atorvastatin", "1.671", "37")):
+    check("N8", f"ST1 {m} B3LYP with celecoxib's stage ratios", lambda m=m: fixed_ratio(m), v)
+    check("N8", f"ST1 {m}: % of the drop from celecoxib explained by the share shift",
+          lambda m=m: 100 * (whole("st1", "celecoxib", "b3lyp") - fixed_ratio(m))
+          / (whole("st1", "celecoxib", "b3lyp") - whole("st1", m, "b3lyp")), f)
+_oth = lambda: [1 - share("st1", m, "b3lyp", "xc_s")() - share("st1", m, "b3lyp", "jk_s")()
+                for m in ("paracetamol", "celecoxib", "sildenafil", "atorvastatin")]
+check("N8", "ST1 B3LYP: DF build + eigensolver + other, share of stock, lowest", lambda: min(_oth()), "0.14")
+check("N8", "ST1 B3LYP: DF build + eigensolver + other, share of stock, highest", lambda: max(_oth()), "0.16")
+check("N8", "ST1 atorvastatin B3LYP: share of stock outside XC (accelerated <= 7 %)",
+      lambda: 1 - share("st1", "atorvastatin", "b3lyp", "xc_s")(), "0.65")
+check("N8", "ST1 r2SCAN DF-build call, stock, celecoxib (s)", lambda: stage("st1", "celecoxib", "r2scan", "stock", "dfbuild_s"),
+      "0.05")
+
+
+def _runs(p):
+    import json
+    t = _sentinel(p).decode()
+    return json.loads([l for l in t.splitlines() if l.startswith("RFCBENCH_JSON ")][0].split(" ", 1)[1])["extra"]["runs"]
+
+
+def _nfp32(ph):
+    return sum(int(t.split("*")[1]) for t in ph.split(",") if t.startswith("fp32"))
+
+
+check_true("N8", "ST1 B3LYP mixed: XC in FP32 for 8 iterations at sildenafil, 10-11 elsewhere; K in FP32 for 8-9 "
+           "of 13-15 J/K calls",
+           lambda: {(r["mol"], _nfp32(r["xc_phases"])) for r in _runs("st1") if r["arm"] == "mixed" and r["xc"] == "b3lyp"}
+           == {("paracetamol", 10), ("celecoxib", 11), ("sildenafil", 8), ("atorvastatin", 11)}
+           and {_nfp32(r["k_phases"]) for r in _runs("st1") if r["arm"] == "mixed" and r["xc"] == "b3lyp"} == {8, 9}
+           and {int(r["jk_n"]) for r in rows("st1") if r["arm"] == "mixed" and r["xc"] == "b3lyp"} == {13, 14, 15})
+for a, v in (("stock", "2.1"), ("mixed", "6.2")):
+    check("N8", f"CC1 {a}: T_S above M0's summed warm walls for the same six cells (%)",
+          lambda a=a: 100 * (t_s(a) / sum(med("m0", cell(m, x), a) for x in ("r2scan", "b3lyp") for m in TRIO) - 1), v)
+for arm, inst, v in (("stock", M1, "1.333"), ("stock", M2, "1.363"), ("mixed", M1, "1.340"), ("mixed", M2, "1.363")):
+    check("N8", f"MIG comparator (PREREG-7): 4 x sum M0 / sum instance, {arm} {'M1' if inst == M1 else 'M2'}",
+          lambda arm=arm, inst=inst: 4 * sum(med("m0", cell(m, x), arm) for x in ("r2scan", "b3lyp") for m in TRIO)
+          / sum(med(inst, cell(m, x), arm) for x in ("r2scan", "b3lyp") for m in TRIO), v)
+check_true("N8", "CC1: each of the four processes ran each of the six cells exactly once in every C4 phase",
+           lambda: all(sorted((r["mol"], r["xc"]) for r in xrows("cc1", phase=ph, proc=q))
+                       == sorted((m, x) for x in ("r2scan", "b3lyp") for m in TRIO)
+                       for ph in ("C4_stock", "C4_mixed", "C4_stock_mps", "C4_mixed_mps") for q in "0123"))
+check_true("N8", "CC1: every B3LYP DF tensor is a device array (cupy.ndarray)",
+           lambda: all(r["cderi"]["types"] == ["cupy.ndarray"] for r in _runs("cc1") if r["xc"] == "b3lyp")
+           and sum(r["xc"] == "b3lyp" for r in _runs("cc1")) == 60)
+
+
+def _plan_ok(p, want):
+    got = sorted((r["phase"], r["mol"], r["xc"], r["arm"], r["pair"]) for r in rows(p))
+    return got == sorted(want)
+
+
+ARMS3 = ("mixed", "cache", "stock")
+check_true("N8", "planned coverage, pinned: CS1 5 phases x 3 functionals x 2 runs; ST1 6 cells x 3 arms x 2 pairs; "
+           "ST2/ST2r 2 cells x 3 arms x 2 pairs; each exactly once",
+           lambda: _plan_ok("cs1", [(ph, "paracetamol", x, "stock" if ph.startswith("P1") else "mixed", q)
+                                     for ph in CS1 for x in XCS3 for q in "01"])
+           and _plan_ok("st1", [(f"stages_{x}", m, x, a, q) for (m, x) in [(k[1], k[2]) for k in ST if k[0] == "st1"]
+                                for a in ARMS3 for q in "01"])
+           and all(_plan_ok(p, [("stages_b3lyp", m, "b3lyp", a, q) for m in ("celecoxib", "sildenafil")
+                                for a in ARMS3 for q in "01"]) for p in ("st2", "st2r")))
+check_true("N8", "PREREG-7 extra pods: cycles of every arm within 1 of the pod's stock for the same molecule/functional",
+           lambda: all(abs(int(r["cycles"]) - one({int(s["cycles"]) for s in rows(p) if s["arm"] == "stock"
+                                                   and (s["mol"], s["xc"]) == (r["mol"], r["xc"])})) <= 1
+                       for p in EXTRA_PODS for r in rows(p)))
+check("N8", "CC1 stock-vs-stock |dE| pooled across phases (Ha)",
+      lambda: max(max(es) - min(es) for es in [[float(r["e"]) for r in rows("cc1") if r["arm"] == "stock"
+                                                and (r["mol"], r["xc"]) == k]
+                                               for k in {(r["mol"], r["xc"]) for r in rows("cc1")}]), "3.2e-12")
+
+
+def _uuid(p):
+    return _sentinel(p).decode().split("UUID: ", 1)[1][:12]
+
+
+check_true("N8", "pods are not cards: the 5 healthy W pods ran on 3 cards; B1, C0w, D2a-c, XL1-XL3b on one card; "
+           "L12r, L12r2, ST1 on one card",
+           lambda: len({_uuid(p) for p in W_HEALTHY}) == 3 and len(W_HEALTHY) == 5
+           and len({_uuid(p) for p in ("b1", "c0w", "d2a", "d2b", "d2c", "xl1", "xl2", "xl3a", "xl3b")}) == 1
+           and len({_uuid(p) for p in ("l12r", "l12r2", "st1")}) == 1)
+
+
+def _timeline():
+    with open(os.path.join(PROV, "TIMELINE.csv"), newline="") as fh:
+        return list(csv.DictReader(fh))
+
+
+def _t(s):
+    import datetime
+    return datetime.datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ")
+
+
+check("N8", "minutes from PREREG-7's last pre-dispatch protocol commit to the first PREREG-7 dispatch",
+      lambda: (min(_t(r["time_utc"]) for r in _timeline() if r["kind"] == "run created" and r["what"] == "cs1")
+               - max(_t(r["time_utc"]) for r in _timeline() if r["kind"] == "protocol commit"
+                     and r["what"].startswith("PREREG-rfcbench-7") and _t(r["time_utc"]) < _t("2026-10-06T21:36:02Z"))
+               ).total_seconds() / 60, "7.5")
+check_true("N8", "TIMELINE: every PREREG-7 run was created after every pre-dispatch PREREG-7 protocol commit, "
+           "and no two PREREG-7 runs overlap",
+           lambda: (lambda runs: all(a[1] <= b[0] for a, b in zip(runs, runs[1:])) and len(runs) == 8)(
+               sorted((min(_t(r["time_utc"]) for r in _timeline() if r["what"] == n and r["kind"] == "run created"),
+                       min(_t(r["time_utc"]) for r in _timeline() if r["what"] == n and r["kind"] == "run finished"))
+                      for n in ("cs1", "l12r", "l12r2", "x3r", "st1", "st2", "st2r", "cc1"))))
+
+
 # PREREG-7 gates, re-derived: every SCF converged, and |E_arm - E_stock| <= 1e-8 Ha against the
 # pod's own stock energy for the same molecule and functional.
 def x_gate_worst():
@@ -1003,7 +1171,7 @@ def data_integrity():
     return probs
 
 
-EXPECTED_CHECKS = 649   # pinned: a check that silently disappears (or appears) is a FAIL
+EXPECTED_CHECKS = 702   # pinned: a check that silently disappears (or appears) is a FAIL
 
 
 def main():

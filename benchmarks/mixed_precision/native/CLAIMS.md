@@ -27,16 +27,20 @@ pruned grids. How much smaller is not measured.
   memory pool.
 - A ratio is stock median / mixed median: above 1 means mixed is faster.
 - Readings: PAYS ≥ 1.15; NEUTRAL in between; HARMS ≤ 0.95.
-- Within a pod, the spread of the R = 3 walls is mostly ≤ 3 %.
+- Within a healthy, non-DEGRADED pod, the spread of the R = 3 walls is mostly ≤ 3 %. On the
+  DEGRADED replicates (L12r, L12r2) and on X3r it is not.
 - **Between pods.**
-  - Healthy pods of the same edition agree closely, to about 1 % on stock walls and about 6 % on
+  - Healthy PRO 6000 Workstation pods agree closely, to about 1 % on stock walls and about 6 % on
     ratios. For example, paracetamol wB97M-V stock is 19.07 s on W1 against 18.94 s on C0w.
+    **That does not hold on the H100.** Two healthy H100 pods, X3 and X3r, differ by 4–34 % on
+    every wall, and by about 25 % on stock (see C3).
   - Including the CONTENTION-UNKNOWN C0 or the Server Edition, readings span 10–20 % or more, and
     stock walls 15–37 %. For example, the PRO 6000 B3LYP trio is 1.688 on C0, 1.860 on L12 and
     2.019 on M0.
-  - L12 (r2SCAN, B3LYP) and the H100 were each replicated once (PREREG-7):
-    - L12's geomeans moved by at most 0.090. Both replicates were DEGRADED, and they drew the
-      same physical card.
+  - PREREG-7 re-ran L12 (r2SCAN, B3LYP) twice and the H100 once:
+    - L12's two replicates were both DEGRADED and drew the same physical card. The pre-registered
+      test therefore cannot be run on them; a post-hoc comparison on clean cells is consistent
+      with L12 (C1).
     - On the H100, B3LYP's mixed/stock moved by 0.115, past the ±0.10 band.
   - Treat the third decimal as reproducibility of the data, not of the hardware.
 
@@ -46,25 +50,39 @@ pruned grids. How much smaller is not measured.
 |---|---|---|---|---|
 | r2SCAN | **1.657** | 1.576 / 1.665 / 1.804 | 1.523–1.871 | 1 (L12), replicated below |
 | B3LYP | **1.783** | 1.736 / 1.779 / 1.897 | 1.584–1.994 | 1 (L12), replicated below |
-| wB97M-V (VV10 component) | **2.914** | 2.848 / 2.995 / 2.806 | 2.593–3.250 | 5 healthy (W1–W3, W4r, W5) |
+| wB97M-V (VV10 component) | **2.914** | 2.848 / 2.995 / 2.806 | 2.593–3.250 | 5 healthy (W1–W3, W4r, W5), on 3 cards |
 
 - All three are inside their pre-registered ±15 % bands. Bands that wide make "in band" a weak
   test.
-- **Replication** (PREREG-7, `[N8]`). L12 was re-run twice, as L12r and L12r2. Both were DEGRADED
-  (19 and 21 of 48 cells NOISY), so only clean cells are quoted:
+- **Replication: not testable as pre-registered; a post-hoc comparison is consistent** (PREREG-7,
+  `[N8]`).
+  - L12 was re-run twice, as L12r and L12r2. Both were DEGRADED (19 and 21 of 48 cells NOISY).
+  - Under PREREG-0 §3 a DEGRADED pod's aggregates are not quotable. So the pre-registered test,
+    pod geomean against L12's within ±0.10, cannot validly be run. The all-24 geomeans are shown
+    only as UNQUOTABLE.
+  - The comparison below is **post hoc**. It restricts L12 to the same clean cells, so it compares
+    like with like:
 
-  | | L12 | L12r / L12r2, all 24 | own clean cells | clean on both |
-  |---|---|---|---|---|
-  | r2SCAN | 1.657 | 1.721 / 1.718 | 1.717 (16) / 1.734 (16) | 1.709 / 1.720 (11) |
-  | B3LYP | 1.783 | 1.844 / 1.868 | 1.872 (13) / 1.873 (11) | 1.830 / 1.818 (5) |
+  | | replicate, clean cells (n) | L12, same cells | difference |
+  |---|---|---|---|
+  | r2SCAN, L12r | 1.717 (16) | 1.660 | +0.057 |
+  | r2SCAN, L12r2 | 1.734 (16) | 1.671 | +0.062 |
+  | r2SCAN, clean on both, L12r / L12r2 | 1.709 / 1.720 (11) | 1.660 | +0.049 / +0.060 |
+  | B3LYP, L12r | 1.872 (13) | 1.799 | +0.074 |
+  | B3LYP, L12r2 | 1.873 (11) | 1.787 | +0.086 |
+  | B3LYP, clean on both, L12r / L12r2 | 1.830 / 1.818 (5) | 1.759 | +0.072 / +0.059 |
 
-  - Every figure is within 0.090 of L12, inside the ±0.10 replication band. Every figure is also
-    above L12.
-  - Per-cell ratios on the replicates span 1.55–2.02 (r2SCAN) and 1.26–2.13 (B3LYP).
-  - Both replicates and ST1 ran on one physical card, so the replication is two pods, not two
-    cards. L12 had no NOISY cell, and the replicates' noise (mostly mixed-arm walls of 1–5 s) is
-    unexplained.
-  - **Quote 1.66–1.73 (r2SCAN) and 1.78–1.87 (B3LYP)**, not the third decimal.
+  UNQUOTABLE all-24 geomeans: r2SCAN 1.721 / 1.718, B3LYP 1.844 / 1.868.
+
+  - Every replicate reads higher than L12 on the same cells, by 0.05–0.09.
+  - Clean-cell ratios on the replicates span 1.57–2.02 (r2SCAN) and 1.56–2.10 (B3LYP).
+  - The replicates' bridge legs (R = 1, `conv_tol_grad = 1e-5`) read 1.643 and 1.658, against
+    L12's 1.586.
+  - Both replicates and ST1 ran on one physical card, so this is two pods, not two cards.
+  - L12 had no NOISY cell. On the replicates, the NOISY arms are 28 mixed against 17 stock (L12r 16
+    vs 7, L12r2 12 vs 10). The cause is unexplained.
+  - **The headline stays L12's 1.657 and 1.783.** The replicates do not contradict it, but they
+    cannot replace it.
 - The gain rises from S to L. The "flat across tiers" prediction failed.
 - **Two pods, C0 and W4, read about 30 % lower for wB97M-V** and are excluded from the 2.914:
   - C0 reads 2.059 on the trio;
@@ -113,10 +131,23 @@ times, warm pair, stock/mixed:
 | sildenafil | 0.43 | 1.99 | 1.05 |
 | atorvastatin | 0.50 | 3.08 | 1.07 |
 
-- As molecules grow, J/K takes half of the stock SCF, while the mode's FP32 DF-K speeds it up by only
-  5–7 % at 475–559 Da. The XC stage keeps a 2–3× gain throughout. So B3LYP's whole-SCF gain tends
-  to the XC gain diluted by an unaccelerated half. **The K path is what limits B3LYP at size.**
-- r2SCAN keeps K in FP64. Its XC is 85–86 % of the stock SCF, which is why r2SCAN's gain holds up.
+An Amdahl decomposition of one pod, not an established cause:
+- **The share shift.** J/K grows from 9 % to 50 % of the stock SCF. Add DF build, eigensolver and
+  "other" (14–16 % throughout) and at atorvastatin about two-thirds of the stock SCF is accelerated
+  by at most 7 %.
+- **The share shift explains only part of the drop.** Whole-SCF stock/mixed falls from 1.854
+  (celecoxib) to 1.288 (sildenafil) and 1.360 (atorvastatin). Holding celecoxib's stage ratios
+  fixed and moving only the shares (the untimed remainder held unaccelerated), those would be 1.748
+  and 1.671. So the share shift explains about 19 % and 37 % of the drop.
+- **The rest is unexplained:**
+  - the FP32 J/K speedup is not monotonic in size: 0.95, 1.50, 1.05, 1.07;
+  - at sildenafil the XC switch came early (8 FP32 iterations, against 10–11 elsewhere), which is
+    why its XC ratio is 1.99.
+- **Recorded, and relevant.** The J/K stage contains J, which is always FP64. Its K part ran in FP32
+  in only 8–9 of 13–15 iterations, so most of that stage's time is FP64 by construction.
+- What the data support: at 475–559 Da the FP32 J/K path buys 5–7 %, and XC still buys 2–3×.
+- r2SCAN has no exact exchange, so its J/K stage is J only, always in FP64. XC is 85–86 % of its
+  stock SCF, which fits r2SCAN's gain holding up.
 - On a MIG 1g.24gb slice (ST2r), FP32 K gains a little (1.09 and 1.17). The prediction that it
   harms there was wrong.
 - The FP64 AO cache alone barely moves XC (0.91–1.00 of stock) and leaves J/K unchanged.
@@ -136,11 +167,14 @@ arithmetic's gain, with the cache's own gain removed.
   - wB97M-V: the mode makes it 1.6–2× *slower*. The H100 trio is 0.577 and 0.615, i.e. 1.73× and
     1.63× slower; the clean A100 cells are 0.488–0.596.
   - B3LYP: up to 1.4× slower (0.711).
-  - r2SCAN: mixed/stock still reads 1.32–1.40 on the H100, but all of that is the FP64 AO cache.
-    The FP32 switch itself is neutral (1.084 on both pods).
+  - r2SCAN: mixed/stock still reads 1.32–1.40 on the H100, almost all of it from the FP64 AO
+    cache. The FP32 switch itself is NEUTRAL (1.084 on both pods).
 - **H100 B3LYP mixed/stock is a range, 0.905–1.021 (HARMS to NEUTRAL).** The replication moved it by
-  0.115, past the ±0.10 band, so no single-pod headline is quoted. The *precision effect* replicated
-  to within 0.024 on all three functionals. What moved is the cache's own gain (cache/stock).
+  0.115, past the ±0.10 band, so no single-pod headline is quoted.
+  - The *precision effect* (mixed/cache) replicated to within 0.024 on all three functionals.
+  - **X3r was a slower pod.** Every wall was 4–34 % slower than X3's, and stock slowed the most:
+    by 1.25 / 1.25 / 1.12 by functional, against 1.18 / 1.14 / 1.10 for cache and 1.18 / 1.11 /
+    1.06 for mixed. So every ratio over stock rose, and mixed/cache barely moved.
 - **What the data does not show:** a threshold or a mechanism.
   - The data has only two levels of FP64:FP32 throughput, about 1:64 (PRO 6000, L40S) and about 1:2
     (H100, A100).
@@ -152,8 +186,8 @@ arithmetic's gain, with the cache's own gain removed.
   The RFC must either propose a guard (for example a warning or refusal on sm_80/sm_90-class
   devices, with a test) or say plainly that users must not enable it there.
 - **The FP64 AO cache alone** (`MixedPrecision(ao_cache_fp64=True)`, no FP32 arithmetic) pays about
-  1.15–1.25 on these cards **for r2SCAN and B3LYP only**. For wB97M-V it is NEUTRAL: 1.070 on the
-  H100.
+  1.15–1.34 on these cards **for r2SCAN and B3LYP only**. The high end is X3r, the slow-stock pod.
+  For wB97M-V it is NEUTRAL: 1.070–1.092 on the H100.
 - **No data:** the RTX 5090 (n/a-by-capacity, two attempts of a pre-registered three) and the PRO
   6000's r2SCAN/B3LYP precision effect, which exists only on the CONTENTION-UNKNOWN C0 (1.543 /
   1.633) and is not claimed.
@@ -191,8 +225,8 @@ arithmetic's gain, with the cache's own gain removed.
   concurrently reaches a throughput gain G ≥ 1.25 on both arms, MIG leaves the claims. It did.
 - The material below is advice for people deploying the mode. It is not a property of the library.
 
-**A concurrent whole card under MPS beats four MIG slices** (CC1, one RTX PRO 6000 Server Edition,
-the trio × {r2SCAN, B3LYP}). G4 = 4 × T_S / T_C4. T_S is one process doing the six cells one at a
+**A concurrent whole card under MPS beats the four-slice MIG projection** (CC1: **one pod**, one RTX
+PRO 6000 Server Edition, the trio × {r2SCAN, B3LYP}). G4 = 4 × T_S / T_C4. T_S is one process doing the six cells one at a
 time; T_C4 is four processes doing them together, timed by makespan.
 
 | arm | serial T_S (s) | 4 processes, time-sliced | 4 processes under MPS | MIG projection (PREREG-5) |
@@ -207,6 +241,10 @@ time; T_C4 is four processes doing them together, timed by makespan.
   the device.
 - **The memory pool was freed after every SCF in CC1**, in all its phases, so that four processes
   could share the card. That departs from the warm-pool rule used everywhere else.
+  - It makes the serial baseline slower. T_S is 2.1 % (stock) and 6.2 % (mixed) above M0's summed
+    warm walls for the same six cells.
+  - That inflates G relative to the MIG comparator by about that much. The decision rule still
+    holds with a wide margin.
 - **Timing definition.** T uses each SCF's span, which includes building the molecule and the SCF
   object. The MIG figures use kernel walls.
 - **Not measured: true four-instance MIG concurrency.** RunPod could not place four 1g.24gb pods on
@@ -259,22 +297,27 @@ is a fresh process with the caches as shown. Cold extra = cold wall − warm wal
 | P4 | CuPy kernel cache wiped | mixed | 9.93 |
 | P5 | CUDA driver cache wiped | mixed | **125.7** |
 
-- **It is the driver JIT-compiling gpu4pyscf's PTX.** The gpu4pyscf-cuda12x 1.8.1 wheel is built
-  for `70-real;80;90-real`, so on sm_120 the driver compiles compute_80 PTX on first load. P1
-  leaves 60 files, 128 MB, in `CUDA_CACHE_PATH`. Wiping that cache brings back about 126 s; wiping
-  CuPy's costs about 10 s.
+- **It is the CUDA driver's JIT cache.** P1 leaves 60 files, 128 MB, in `CUDA_CACHE_PATH`. Wiping
+  that cache brings back about 126 s; wiping CuPy's costs about 10 s.
+- **Whose code is compiled is not established.** The likely source is gpu4pyscf's own modules: the
+  gpu4pyscf-cuda12x 1.8.1 wheel's build lists `70-real;80;90-real`, so on sm_120 the driver must
+  compile compute_80 PTX. But that is an external fact, not shipped here. The 60 cache files are not
+  attributed to a binary, and gpu4pyscf-libxc-cuda12x is loaded too.
 - **It is not the mode's cost.** The stock arm paid it first (P1), and the mixed arm then paid under
   2 s (P2). In the campaign pods the mixed arm ran first in each pair, which is why the cost showed
   up there.
-- **It is charged to whichever functional runs first in a process.** r2SCAN ran first in every
-  phase, so the other functionals' small extras (≤ 1.62 s) say nothing about their own kernels.
-- **Remedy.** Keep `CUDA_CACHE_PATH` on persistent storage, or ship a wheel that includes sm_120
-  code. The campaign's speed figures exclude the cold pair, so they are steady-state figures either
-  way.
+- **It is charged to the first SCF run against an empty cache**, not to the first SCF of every
+  process. In P2 and P3 the first functional of a new process paid ≤ 1.86 s. r2SCAN ran first in
+  every phase, so the other functionals' small extras (≤ 1.62 s) say nothing about their own
+  kernels.
+- **Remedy, untested.** Keep both `CUDA_CACHE_PATH` and CuPy's kernel cache on persistent storage.
+  The driver cache alone would leave about 10 s (P4). A wheel that includes sm_120 code should
+  remove the driver's share, but that was not measured. The campaign's speed figures exclude the
+  cold pair, so they are steady-state figures either way.
 
 ## What can and cannot be verified from this package
 
-- **Can, with nothing but this directory** (`verify_native.py`, 640 checks):
+- **Can, with nothing but this directory** (`verify_native.py`, all of its checks):
   - every number in this file, recomputed from the per-run CSVs;
   - every per-run CSV, re-extracted from the pod's own result file (`provenance/sentinels/`) by the
     shipped extractor, column for column;
@@ -368,6 +411,14 @@ listed numbers are checked by `verify_native.py`:
 | PREREG-7 RESULT, CS1 cold extras: P1 wB97M-V, P2 wB97M-V, P4 r2SCAN, P4 B3LYP | 0.64, 1.13, 9.92, 1.61 | 0.65, 1.12, 9.93, 1.60 (computed from rounded readings; erratum in the protocol) |
 | PREREG-7 RESULT, X3r − X3: B3LYP mixed/stock; r2SCAN precision effect | 0.116; 0.000 | 0.115; −0.001 |
 | PREREG-7 RESULT, "DF build and eigensolver the same in every arm" | — | within 5 %, except r2SCAN's ~0.05 s DF-build call (up to 9 %, ≤ 5 ms) |
+| PREREG-7 RESULT, L12r replication | evaluated on DEGRADED pods' aggregates; "the ladder replicates" | not testable as pre-registered (PREREG-0 §3); a post-hoc like-for-like clean-cell comparison is consistent (+0.05 to +0.09) |
+| PREREG-7 RESULT, replicate per-cell spans | 1.55–2.02, 1.26–2.13 (NOISY cells included) | clean cells 1.57–2.02, 1.56–2.10 |
+| PREREG-7 RESULT, X3r | "the cache tier is what moves between pods" | X3r was a slower pod (walls +4–34 %, stock the most), so every ratio over stock rose |
+| PREREG-7 RESULT, ST1 | "the K path is what limits B3LYP at size" | withdrawn: the share shift explains about 19–37 % of the drop; the rest is unexplained |
+| PREREG-7 RESULT, cold start | "a wheel built with `120-real` would remove it"; charged to "whichever functional runs first in the process" | untested; charged to the first SCF against an empty cache |
+| PREREG-7 RESULT, headline | "both replications hold on their geomeans" | the X3r falsifier fired on a geomean; L12r's could not be run as registered |
+| PREREG-7 RESULT, X3r idle | "higher than any Blackwell pod here" | ST2 idled at 241 W |
+| PREREG-7 RESULT, stock-vs-stock floor | ≤ 2.8e-12 Ha | 3.2e-12 Ha when CC1 is pooled across phases (2.3e-12 within a phase) |
 
 **Procedural lapses:**
 - The RTX 5090's third capacity attempt was not made inside its window.
@@ -379,7 +430,10 @@ listed numbers are checked by `verify_native.py`:
   regenerated from the same sources. The regenerated file reproduces every row of the unshipped one.
 - **L12r was re-dispatched as L12r2 without asking the owner first.** PREREG-0 §3 requires the
   re-dispatch. For X4, the owner had been asked.
-- **L12r, L12r2 and ST1 drew the same physical card.** That was not controlled.
+- **Pods are not cards.** L12r, L12r2 and ST1 drew one physical card. The five healthy wB97M-V
+  ladder pods ran on three cards (W2 and W3 on one, W4r and W5 on another). B1, C0w, D2a–c and
+  XL1–XL3b all ran on one card. None of this was controlled. Only the first case was disclosed when
+  the package was first updated for PREREG-7; the independent review found the rest.
 - **PREREG-0 §6's two-repeats rule was again applied to two DEGRADED pods**, here L12r and L12r2.
 - **The ST2 re-run was approved on 2026-10-07, after CC1 had been dispatched.** That changed the
   dispatch order, CS1 → L12r → L12r2 → X3r → ST1 → ST2 → CC1 → ST2r, but no protocol text.
