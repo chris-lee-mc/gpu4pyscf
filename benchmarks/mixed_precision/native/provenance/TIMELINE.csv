@@ -1,0 +1,123 @@
+time_utc,kind,what,ref,detail
+2026-10-02T00:16:56Z,protocol commit,PREREG-rfcbench-0-measurand.md,8d92df8b4cf6,docs/upstream: pre-register the rfcbench RFC evidence campaign (PREREG-rfcbench-0..5)
+2026-10-02T00:16:56Z,protocol commit,PREREG-rfcbench-1-native-ladder.md,8d92df8b4cf6,docs/upstream: pre-register the rfcbench RFC evidence campaign (PREREG-rfcbench-0..5)
+2026-10-02T00:16:56Z,protocol commit,PREREG-rfcbench-2-cross-gpu.md,8d92df8b4cf6,docs/upstream: pre-register the rfcbench RFC evidence campaign (PREREG-rfcbench-0..5)
+2026-10-02T00:16:56Z,protocol commit,PREREG-rfcbench-3-large-basis.md,8d92df8b4cf6,docs/upstream: pre-register the rfcbench RFC evidence campaign (PREREG-rfcbench-0..5)
+2026-10-02T00:16:56Z,protocol commit,PREREG-rfcbench-4-downstream.md,8d92df8b4cf6,docs/upstream: pre-register the rfcbench RFC evidence campaign (PREREG-rfcbench-0..5)
+2026-10-02T00:16:56Z,protocol commit,PREREG-rfcbench-5-mig.md,8d92df8b4cf6,docs/upstream: pre-register the rfcbench RFC evidence campaign (PREREG-rfcbench-0..5)
+2026-10-02T01:11:14Z,protocol commit,PREREG-rfcbench-0-measurand.md,0c43d58a834c,rfcbench: pre-dispatch amendments to PREREG-0..4; PREREGs join the freeze tests
+2026-10-02T01:11:14Z,protocol commit,PREREG-rfcbench-1-native-ladder.md,0c43d58a834c,rfcbench: pre-dispatch amendments to PREREG-0..4; PREREGs join the freeze tests
+2026-10-02T01:11:14Z,protocol commit,PREREG-rfcbench-2-cross-gpu.md,0c43d58a834c,rfcbench: pre-dispatch amendments to PREREG-0..4; PREREGs join the freeze tests
+2026-10-02T01:11:14Z,protocol commit,PREREG-rfcbench-3-large-basis.md,0c43d58a834c,rfcbench: pre-dispatch amendments to PREREG-0..4; PREREGs join the freeze tests
+2026-10-02T01:11:14Z,protocol commit,PREREG-rfcbench-4-downstream.md,0c43d58a834c,rfcbench: pre-dispatch amendments to PREREG-0..4; PREREGs join the freeze tests
+2026-10-02T01:36:21Z,run created,c0,36951733967,head 0ee605b64285; PREREG-2 C0 (commissioning; CONTENTION-UNKNOWN)
+2026-10-02T01:38:07Z,protocol commit,PREREG-rfcbench-5-mig.md,ad28ce2dea41,rfcbench: pin the PRO 6000 MIG type and a Server Edition comparator (PREREG-5 A1)
+2026-10-02T02:35:38Z,run finished,c0,36951733967,success
+2026-10-02T04:47:47Z,protocol commit,PREREG-rfcbench-0-measurand.md,b066a9e88915,"rfcbench: C0 banked; calibration, the 25-pod split plan, GPU-state telemetry"
+2026-10-02T04:47:47Z,protocol commit,PREREG-rfcbench-2-cross-gpu.md,b066a9e88915,"rfcbench: C0 banked; calibration, the 25-pod split plan, GPU-state telemetry"
+2026-10-02T05:15:16Z,run created,l12,36968109711,head 78a3412e8629; PREREG-1 L12
+2026-10-02T05:53:57Z,run finished,l12,36968109711,success
+2026-10-02T05:54:48Z,protocol commit,PREREG-rfcbench-1-native-ladder.md,c2230026a6ec,rfcbench: bank L12 (PREREG-1 RESULT part 1) and the per-pair CSVs of C0 and L12
+2026-10-02T05:55:00Z,run created,w1,36971083681,head 78a3412e8629; PREREG-1 W1
+2026-10-02T06:24:43Z,run finished,w1,36971083681,success
+2026-10-02T06:25:04Z,run created,w2,36973444064,head 78a3412e8629; PREREG-1 W2
+2026-10-02T06:52:41Z,run finished,w2,36973444064,success
+2026-10-02T06:52:56Z,run created,w3,36975697910,head 78a3412e8629; PREREG-1 W3
+2026-10-02T07:19:28Z,run finished,w3,36975697910,success
+2026-10-02T07:19:51Z,run created,w4,36977987637,"head 78a3412e8629; PREREG-1 W4 (CONTENDED, reported separately)"
+2026-10-02T08:05:23Z,run finished,w4,36977987637,success
+2026-10-02T12:39:57Z,protocol commit,PREREG-rfcbench-0-measurand.md,fbeb80f56224,rfcbench: PREREG-0 Amendment 3 (CONTENDED pods) before W5; W4 banked as contended
+2026-10-02T12:40:14Z,run created,w5,37008076314,head 78a3412e8629; PREREG-1 W5
+2026-10-02T13:02:40Z,run finished,w5,37008076314,success
+2026-10-02T13:03:08Z,run created,w4r,37010453926,head 78a3412e8629; PREREG-1 W4r
+2026-10-02T13:31:24Z,run finished,w4r,37010453926,success
+2026-10-02T13:32:27Z,protocol commit,PREREG-rfcbench-1-native-ladder.md,adcbbf4a5785,rfcbench: bank the wB97M-V ladder (PREREG-1 RESULT part 2); W4r CSV
+2026-10-02T17:08:04Z,run created,d1,37038641497,"head 3890e545d9cc; PREREG-4 D1 (STATUS=FAIL, one dipole gate)"
+2026-10-02T17:20:32Z,run finished,d1,37038641497,failure
+2026-10-02T17:21:24Z,protocol commit,PREREG-rfcbench-4-downstream.md,08d3a2d2280e,rfcbench: bank D1 as FAIL (PREREG-4 RESULT part 1)
+2026-10-02T17:21:37Z,run created,d2a,37040169998,head 3890e545d9cc; PREREG-4 D2a
+2026-10-02T17:37:44Z,run finished,d2a,37040169998,success
+2026-10-02T17:38:18Z,run created,d2b,37042063662,head 3890e545d9cc; PREREG-4 D2b
+2026-10-02T17:51:13Z,run finished,d2b,37042063662,success
+2026-10-02T17:51:54Z,run created,d2c,37043596852,head 3890e545d9cc; PREREG-4 D2c
+2026-10-02T18:01:50Z,run finished,d2c,37043596852,success
+2026-10-02T18:02:30Z,protocol commit,PREREG-rfcbench-4-downstream.md,a269eb1e87b8,"rfcbench: bank D2 (PREREG-4 RESULT part 2), downstream scope complete"
+2026-10-02T18:02:43Z,run created,c0w,37044790110,head 3890e545d9cc; PREREG-2 C0w
+2026-10-02T18:33:16Z,run finished,c0w,37044790110,success
+2026-10-02T18:33:47Z,protocol commit,PREREG-rfcbench-2-cross-gpu.md,d6d5b2d0e86b,rfcbench: bank C0w (PREREG-2 RESULT part 2)
+2026-10-02T18:33:58Z,run created,xl1,37048299066,head 3890e545d9cc; PREREG-3 XL1
+2026-10-02T19:01:04Z,run finished,xl1,37048299066,success
+2026-10-02T19:01:56Z,run created,xl2,37051413598,head 3890e545d9cc; PREREG-3 XL2
+2026-10-02T19:38:23Z,run finished,xl2,37051413598,success
+2026-10-02T19:39:09Z,run created,xl3a,37055501906,head 3890e545d9cc; PREREG-3 XL3a
+2026-10-02T20:00:42Z,run finished,xl3a,37055501906,success
+2026-10-02T20:01:53Z,run created,xl3b,37057939484,head 3890e545d9cc; PREREG-3 XL3b
+2026-10-02T20:30:39Z,run finished,xl3b,37057939484,success
+2026-10-02T20:31:47Z,run created,b1,37061160282,head 3890e545d9cc; PREREG-3 B1
+2026-10-02T21:06:31Z,run finished,b1,37061160282,success
+2026-10-02T21:06:56Z,protocol commit,PREREG-rfcbench-3-large-basis.md,c3a80a9d8557,rfcbench: bank scope 3 (PREREG-3 RESULT): large molecules and bases
+2026-10-02T21:10:27Z,run created,x2a,37065229751,head 3890e545d9cc; PREREG-2 X2a
+2026-10-02T21:35:48Z,run finished,x2a,37065229751,success
+2026-10-02T21:36:20Z,run created,x2b,37067826972,head 3890e545d9cc; PREREG-2 X2b
+2026-10-02T22:04:56Z,run finished,x2b,37067826972,success
+2026-10-02T22:05:20Z,run created,x3,37070570095,head 3890e545d9cc; PREREG-2 X3
+2026-10-02T22:15:01Z,run finished,x3,37070570095,success
+2026-10-02T22:16:08Z,run created,x4,37071560009,head 3890e545d9cc; PREREG-2 X4 (DEGRADED)
+2026-10-02T22:32:18Z,run finished,x4,37071560009,success
+2026-10-02T22:35:13Z,run created,m0,37073279025,head 3890e545d9cc; PREREG-5 M0
+2026-10-02T22:52:08Z,run finished,m0,37073279025,success
+2026-10-03T13:02:19Z,protocol commit,PREREG-rfcbench-5-mig.md,60f79ac35f6d,rfcbench: create pro6000mig pods through GraphQL; verify every pod delete
+2026-10-05T04:01:08Z,run created,m1a,37261720977,head bda4cf5146c5; PREREG-5 M1a
+2026-10-05T04:19:53Z,run finished,m1a,37261720977,success
+2026-10-05T04:20:41Z,run created,m1b,37263100639,head bda4cf5146c5; PREREG-5 M1b
+2026-10-05T04:57:29Z,run finished,m1b,37263100639,success
+2026-10-05T04:58:36Z,run created,m2a,37265768276,"head bda4cf5146c5; PREREG-5 M2a (CONTENDED, reported separately)"
+2026-10-05T05:16:25Z,run finished,m2a,37265768276,success
+2026-10-05T05:17:28Z,run created,m2b,37267116454,"head bda4cf5146c5; PREREG-5 M2b (CONTENDED, reported separately)"
+2026-10-05T05:53:23Z,run finished,m2b,37267116454,success
+2026-10-05T12:35:40Z,run created,m2ar,37310614922,head bda4cf5146c5; PREREG-5 M2ar
+2026-10-05T12:54:01Z,run finished,m2ar,37310614922,success
+2026-10-05T12:54:41Z,run created,m2br,37312821303,head bda4cf5146c5; PREREG-5 M2br
+2026-10-05T13:31:43Z,run finished,m2br,37312821303,success
+2026-10-05T13:33:43Z,protocol commit,PREREG-rfcbench-5-mig.md,e8ae2a93df23,"rfcbench: PREREG-5 RESULT (MIG), bank M2br CSV"
+2026-10-05T14:10:05Z,protocol commit,PREREG-rfcbench-5-mig.md,ecd7b68cc950,"PREREG-5 RESULT: state wB97M-V mixed MIG gain as PAYS (1.16-1.20), not 'little'"
+2026-10-05T15:17:17Z,protocol commit,PREREG-rfcbench-6-mig-fit.md,13cc3011dfd7,rfcbench: PREREG-6 and mode=migfit (MIG instance fit limit)
+2026-10-05T21:58:48Z,run created,f0,37379456085,head e9b75f3797dd; PREREG-6 F0
+2026-10-05T22:25:49Z,run finished,f0,37379456085,success
+2026-10-05T22:27:39Z,protocol commit,PREREG-rfcbench-6-mig-fit.md,7fee59d508c8,PREREG-6 Amendment 1 (before F1a): r2SCAN builds no DF tensor; withdraw its placement predictions; bank F0 CSV
+2026-10-05T22:29:06Z,run created,f1a,37382762854,head e9b75f3797dd; PREREG-6 F1a
+2026-10-05T23:07:27Z,run finished,f1a,37382762854,success
+2026-10-05T23:09:51Z,run created,f1b,37386887345,head e9b75f3797dd; PREREG-6 F1b
+2026-10-05T23:59:52Z,run finished,f1b,37386887345,success
+2026-10-06T00:01:52Z,run created,x4r,37391778846,head 3890e545d9cc; PREREG-2 X4r (DEGRADED)
+2026-10-06T00:03:27Z,protocol commit,PREREG-rfcbench-6-mig-fit.md,b0ee3b03aa01,PREREG-6 RESULT (MIG fit limit): F0/F1a/F1b PASS
+2026-10-06T00:19:18Z,run finished,x4r,37391778846,success
+2026-10-06T00:20:55Z,protocol commit,PREREG-rfcbench-2-cross-gpu.md,795e7297762a,"PREREG-2 RESULT part 3: L40S PAYS, H100 HARMS, A100 DEGRADED twice (clean cells), 5090 n/a-by-capacity; bank X4r CSV"
+2026-10-06T14:09:23Z,protocol commit,PREREG-rfcbench-1-native-ladder.md,6771ef1663a5,rfcbench: errata to the PREREG-1..6 RESULTs from the evidence-package review
+2026-10-06T14:09:23Z,protocol commit,PREREG-rfcbench-2-cross-gpu.md,6771ef1663a5,rfcbench: errata to the PREREG-1..6 RESULTs from the evidence-package review
+2026-10-06T14:09:23Z,protocol commit,PREREG-rfcbench-3-large-basis.md,6771ef1663a5,rfcbench: errata to the PREREG-1..6 RESULTs from the evidence-package review
+2026-10-06T14:09:23Z,protocol commit,PREREG-rfcbench-4-downstream.md,6771ef1663a5,rfcbench: errata to the PREREG-1..6 RESULTs from the evidence-package review
+2026-10-06T14:09:23Z,protocol commit,PREREG-rfcbench-5-mig.md,6771ef1663a5,rfcbench: errata to the PREREG-1..6 RESULTs from the evidence-package review
+2026-10-06T14:09:23Z,protocol commit,PREREG-rfcbench-6-mig-fit.md,6771ef1663a5,rfcbench: errata to the PREREG-1..6 RESULTs from the evidence-package review
+2026-10-06T14:18:06Z,protocol commit,PREREG-rfcbench-4-downstream.md,501e97299480,rfcbench errata: correct the PREREG-6 date erratum and the PREREG-4 rho_g cause
+2026-10-06T14:18:06Z,protocol commit,PREREG-rfcbench-6-mig-fit.md,501e97299480,rfcbench errata: correct the PREREG-6 date erratum and the PREREG-4 rho_g cause
+2026-10-06T16:34:41Z,protocol commit,PREREG-rfcbench-7-coldstart-stages-concurrency.md,ba1f1ea33af5,rfcbench: PREREG-7 and the coldstart / stages / concur modes
+2026-10-06T21:28:32Z,protocol commit,PREREG-rfcbench-7-coldstart-stages-concurrency.md,75fe369df370,"rfcbench PREREG-7: fixes from the pre-flight review (stage timer, MPS, caps)"
+2026-10-06T21:36:02Z,run created,cs1,37535025280,head d05888b8eda8; PREREG-7 CS1
+2026-10-06T22:22:52Z,run finished,cs1,37535025280,success
+2026-10-06T22:24:29Z,run created,l12r,37540378856,head d05888b8eda8; PREREG-7 L12r (DEGRADED)
+2026-10-06T23:03:00Z,run finished,l12r,37540378856,success
+2026-10-06T23:04:30Z,run created,l12r2,37544474854,head d05888b8eda8; PREREG-7 L12r2 (DEGRADED)
+2026-10-06T23:41:56Z,run finished,l12r2,37544474854,success
+2026-10-06T23:42:41Z,run created,x3r,37548043266,head d05888b8eda8; PREREG-7 X3r
+2026-10-06T23:55:08Z,run finished,x3r,37548043266,success
+2026-10-06T23:56:49Z,run created,st1,37549313181,head d05888b8eda8; PREREG-7 ST1
+2026-10-07T00:09:57Z,run finished,st1,37549313181,success
+2026-10-07T00:10:22Z,run created,st2,37550550221,"head d05888b8eda8; PREREG-7 ST2 (CONTENDED, reported separately)"
+2026-10-07T00:26:44Z,run finished,st2,37550550221,success
+2026-10-07T00:27:43Z,run created,cc1,37552079534,head d05888b8eda8; PREREG-7 CC1
+2026-10-07T00:44:38Z,run finished,cc1,37552079534,success
+2026-10-07T12:32:18Z,run created,st2r,37621705258,head d05888b8eda8; PREREG-7 ST2r
+2026-10-07T12:48:11Z,run finished,st2r,37621705258,success
+2026-10-07T12:49:48Z,protocol commit,PREREG-rfcbench-7-coldstart-stages-concurrency.md,d82ad1149144,"PREREG-7 RESULT: cold start is driver JIT; L12 replicates; H100 B3LYP range; FP32 K buys little at size; MPS beats MIG, C5 dropped; bank ST2r CSV"
+2026-10-07T12:56:20Z,protocol commit,PREREG-rfcbench-7-coldstart-stages-concurrency.md,222143e24afe,"PREREG-7: erratum to the RESULT (rounded-reading arithmetic), found by the fork verifier"

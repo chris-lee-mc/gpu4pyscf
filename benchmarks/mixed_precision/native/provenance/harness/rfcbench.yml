@@ -12,10 +12,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "commission | ladder | cross | large | basis | downstream | mig | migfit | gputypes"
+        description: "commission | ladder | cross | large | basis | downstream | mig | migfit | coldstart | stages | concur | gputypes"
         type: choice
         required: true
-        options: [commission, ladder, cross, large, basis, downstream, mig, migfit, gputypes]
+        options: [commission, ladder, cross, large, basis, downstream, mig, migfit, coldstart, stages, concur, gputypes]
       gpu:
         description: "pro6000 | 5090 | l40s | h100 | a100 | pro6000mig (blank = the mode's only class; cross needs one)"
         type: string

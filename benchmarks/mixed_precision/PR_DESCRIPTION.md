@@ -23,13 +23,15 @@ The target is GPUs whose FP64 throughput is a small fraction of FP32, such as RT
 Blackwell cards. **This code** measured these whole-SCF speedups against stock GPU4PySCF 1.8.1 on an
 RTX PRO 6000 Blackwell Workstation (24 drug-like molecules, def2-mTZVPP, R = 3; details and caveats
 in `benchmarks/mixed_precision/native/CLAIMS.md`):
-- r2SCAN **1.66×**, B3LYP **1.78×** (one pod each), wB97M-V with the VV10 component **2.91×** (five
-  pods);
+- r2SCAN **1.66–1.73×** and B3LYP **1.78–1.87×**. These are the original pod, plus two replicate
+  pods quoted on clean cells only;
+- wB97M-V with the VV10 component **2.91×** (five pods);
 - measured with the opt-in FP64 AO cache on, an unpruned grid and B3LYP `xc_switch_tol=3e-4`. The
   library defaults and pruned grids were **not** measured, and should give smaller gains.
 
-**Do not enable it on the FP64-strong GPUs tested.** On an H100 and an A100 it made wB97M-V 1.7–2×
-slower and B3LYP up to 1.4× slower. r2SCAN's 1.32× there came entirely from the FP64 AO cache. The
+**Do not enable it on the FP64-strong GPUs tested.** On an H100 and an A100 it made wB97M-V 1.6–2×
+slower and B3LYP up to 1.4× slower. B3LYP on two H100 pods read 0.905–1.021, i.e. HARMS to NEUTRAL.
+r2SCAN's 1.32–1.40× there came entirely from the FP64 AO cache. The
 code does not detect this today (see Limitations). Other FP64-strong parts and consumer RTX cards
 were not measured.
 
@@ -109,16 +111,27 @@ two files and touches `numint.py`; it is not in that count.
 ## Limitations and open questions
 
 - **Speed numbers.** They come from this code (`native/`), at the non-default settings listed
-  there. The defaults are not measured. The headline r2SCAN and B3LYP rows rest on single pods.
-  Healthy same-edition pods agree to about 1–6 %, but readings span 10–20 % once a
-  CONTENTION-UNKNOWN pod or the other edition is included.
+  there. The defaults are not measured.
+  - The r2SCAN and B3LYP rows were replicated on two more pods. Both were DEGRADED, so their clean
+    cells are what is quoted. They read within 0.09 of the original, all above it.
+  - Healthy same-edition pods agree to about 1–6 %, but readings span 10–20 % once a
+    CONTENTION-UNKNOWN pod or the other edition is included.
 - **FP64-strong GPUs.** The FP32 switch is harmful on the H100 and A100 tested, and nothing in the
   code warns or refuses there. Open question for maintainers: add a device guard (for example by
   compute capability), or document it only? Only two FP64:FP32 levels were measured, so no
   threshold is established.
-- **Cold start.** On a fresh Blackwell pod the first mixed SCF took 64–168 s. Later processes on
-  the same pod did not pay it, which is consistent with a persistent kernel-compilation cache but
-  not established. How much of it belongs to the mode was not separated.
+- **Cold start.** On a fresh Blackwell pod the first SCF took 64–168 s. It is not the mode's cost.
+  - The 1.8.1 wheel ships no sm_120 code, so the CUDA driver JIT-compiles gpu4pyscf's compute_80
+    PTX on first load and caches it (60 files, 128 MB).
+  - Stock pays it in full when it runs first. Wiping the driver cache brings it back (about 126 s);
+    wiping CuPy's costs about 10 s.
+  - A persistent `CUDA_CACHE_PATH`, or a wheel that includes sm_120, removes it.
+- **B3LYP at size.** The gain falls with molecule size because J/K grows to half the SCF, and the
+  FP32 K path speeds that stage up by only 5–7 % at 475–559 Da. XC keeps a 2–3× gain. A faster
+  FP32 K, or leaving K in FP64 for large systems, are open options.
+- **Deployment.** MIG is not part of the proposal. A whole RTX PRO 6000 running four SCFs at once
+  under MPS gives 1.52× (stock) and 1.75× (mixed) the throughput of one at a time. That beats the
+  four-slice MIG projection of about 1.35×. Without MPS, four concurrent processes gain nothing.
 - **Scope.** The analytic gradient, the Hessian and UKS are out of scope. Range-separated and NLC
   functionals are out of scope for `xc` / `k`; the VV10 component below is the only path that
   treats an NLC functional.

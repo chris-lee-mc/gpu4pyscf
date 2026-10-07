@@ -34,20 +34,37 @@ pruned grids. How much smaller is not measured.
   - Including the CONTENTION-UNKNOWN C0 or the Server Edition, readings span 10–20 % or more, and
     stock walls 15–37 %. For example, the PRO 6000 B3LYP trio is 1.688 on C0, 1.860 on L12 and
     2.019 on M0.
-  - L12 (r2SCAN, B3LYP) and the H100 each rest on one pod, so their own between-pod spread is
-    unknown.
+  - L12 (r2SCAN, B3LYP) and the H100 were each replicated once (PREREG-7):
+    - L12's geomeans moved by at most 0.090. Both replicates were DEGRADED, and they drew the
+      same physical card.
+    - On the H100, B3LYP's mixed/stock moved by 0.115, past the ±0.10 band.
   - Treat the third decimal as reproducibility of the data, not of the hardware.
 
 ## C1. RTX PRO 6000 (Blackwell, FP64-limited): the mode pays for every functional tested `[N1]`
 
 | 24 drug-like molecules, 20–44 atoms | mixed/stock geomean | S / M / L tiers | per-cell range | pods |
 |---|---|---|---|---|
-| r2SCAN | **1.657** | 1.576 / 1.665 / 1.804 | 1.523–1.871 | 1 (L12) |
-| B3LYP | **1.783** | 1.736 / 1.779 / 1.897 | 1.584–1.994 | 1 (L12) |
+| r2SCAN | **1.657** | 1.576 / 1.665 / 1.804 | 1.523–1.871 | 1 (L12), replicated below |
+| B3LYP | **1.783** | 1.736 / 1.779 / 1.897 | 1.584–1.994 | 1 (L12), replicated below |
 | wB97M-V (VV10 component) | **2.914** | 2.848 / 2.995 / 2.806 | 2.593–3.250 | 5 healthy (W1–W3, W4r, W5) |
 
 - All three are inside their pre-registered ±15 % bands. Bands that wide make "in band" a weak
   test.
+- **Replication** (PREREG-7, `[N8]`). L12 was re-run twice, as L12r and L12r2. Both were DEGRADED
+  (19 and 21 of 48 cells NOISY), so only clean cells are quoted:
+
+  | | L12 | L12r / L12r2, all 24 | own clean cells | clean on both |
+  |---|---|---|---|---|
+  | r2SCAN | 1.657 | 1.721 / 1.718 | 1.717 (16) / 1.734 (16) | 1.709 / 1.720 (11) |
+  | B3LYP | 1.783 | 1.844 / 1.868 | 1.872 (13) / 1.873 (11) | 1.830 / 1.818 (5) |
+
+  - Every figure is within 0.090 of L12, inside the ±0.10 replication band. Every figure is also
+    above L12.
+  - Per-cell ratios on the replicates span 1.55–2.02 (r2SCAN) and 1.26–2.13 (B3LYP).
+  - Both replicates and ST1 ran on one physical card, so the replication is two pods, not two
+    cards. L12 had no NOISY cell, and the replicates' noise (mostly mixed-arm walls of 1–5 s) is
+    unexplained.
+  - **Quote 1.66–1.73 (r2SCAN) and 1.78–1.87 (B3LYP)**, not the third decimal.
 - The gain rises from S to L. The "flat across tiers" prediction failed.
 - **Two pods, C0 and W4, read about 30 % lower for wB97M-V** and are excluded from the 2.914:
   - C0 reads 2.059 on the trio;
@@ -84,8 +101,25 @@ cache, on the 96 GB card.
 | r2SCAN | 1.693 | 1.762 | 2.004 |
 | B3LYP | 1.957 | 1.744 | 1.590 |
 
-B3LYP's gain falls with both system size and basis size. The suspected cause is the FP32 DF-K
-path, but **no stage was timed**, so it is not established.
+B3LYP's gain falls with both system size and basis size.
+
+**Why, from stage timing** (PREREG-7 ST1, one 96 GB Workstation card, `[N8]`). Exclusive stage
+times, warm pair, stock/mixed:
+
+| B3LYP | J/K share of stock | XC stock/mixed | J/K stock/mixed |
+|---|---|---|---|
+| paracetamol | 0.09 | 2.56 | 0.95 |
+| celecoxib | 0.34 | 3.12 | 1.50 |
+| sildenafil | 0.43 | 1.99 | 1.05 |
+| atorvastatin | 0.50 | 3.08 | 1.07 |
+
+- As molecules grow, J/K takes half of the stock SCF, while the mode's FP32 DF-K speeds it up by only
+  5–7 % at 475–559 Da. The XC stage keeps a 2–3× gain throughout. So B3LYP's whole-SCF gain tends
+  to the XC gain diluted by an unaccelerated half. **The K path is what limits B3LYP at size.**
+- r2SCAN keeps K in FP64. Its XC is 85–86 % of the stock SCF, which is why r2SCAN's gain holds up.
+- On a MIG 1g.24gb slice (ST2r), FP32 K gains a little (1.09 and 1.17). The prediction that it
+  harms there was wrong.
+- The FP64 AO cache alone barely moves XC (0.91–1.00 of stock) and leaves J/K unchanged.
 
 ## C3. On the two FP64-strong data-centre cards tested, the FP32 switch is harmful for B3LYP and wB97M-V `[N2]`
 
@@ -95,15 +129,18 @@ arithmetic's gain, with the cache's own gain removed.
 | card | pods | mixed/stock r2SCAN / B3LYP / wB97M-V | precision effect | cache alone |
 |---|---|---|---|---|
 | L40S | 1 per cell (X2a, X2b) | 1.729 / 1.524 / 2.994 | 1.655 / 1.463 / 2.981, PAYS | 1.045 / 1.041 / 1.004 |
-| H100 | 1 (X3) | 1.320 / 0.905 / 0.577 | 1.084 / 0.745 / 0.539, NEUTRAL / HARMS / HARMS (B3LYP includes paracetamol, warm walls 0.60–0.73 s) | 1.217 / 1.215 / 1.070 |
+| H100 | 2 (X3, X3r) | X3: 1.320 / 0.905 / 0.577; X3r: 1.398 / 1.021 / 0.615 | X3: 1.084 / 0.745 / 0.539; X3r: 1.084 / 0.764 / 0.563. NEUTRAL / HARMS / HARMS on both (B3LYP includes paracetamol, median warm walls 0.60–0.99 s) | X3: 1.217 / 1.215 / 1.070; X3r: 1.290 / 1.336 / 1.092 |
 | A100 | 2, both DEGRADED | not quotable as geomeans | clean cells only (9 cells, 12 readings): 11 of 12 NEUTRAL or HARMS | 1.153–1.245 on the clean r2SCAN/B3LYP cells |
 
 - **How big the harm is.**
-  - wB97M-V: the mode makes it 1.7–2× *slower*. The H100 trio is 0.577, i.e. 1.73× slower; the
-    clean A100 cells are 0.488–0.596.
+  - wB97M-V: the mode makes it 1.6–2× *slower*. The H100 trio is 0.577 and 0.615, i.e. 1.73× and
+    1.63× slower; the clean A100 cells are 0.488–0.596.
   - B3LYP: up to 1.4× slower (0.711).
-  - r2SCAN: mixed/stock still reads 1.32 on the H100, but all of that is the FP64 AO cache. The
-    FP32 switch itself is neutral (1.084).
+  - r2SCAN: mixed/stock still reads 1.32–1.40 on the H100, but all of that is the FP64 AO cache.
+    The FP32 switch itself is neutral (1.084 on both pods).
+- **H100 B3LYP mixed/stock is a range, 0.905–1.021 (HARMS to NEUTRAL).** The replication moved it by
+  0.115, past the ±0.10 band, so no single-pod headline is quoted. The *precision effect* replicated
+  to within 0.024 on all three functionals. What moved is the cache's own gain (cache/stock).
 - **What the data does not show:** a threshold or a mechanism.
   - The data has only two levels of FP64:FP32 throughput, about 1:64 (PRO 6000, L40S) and about 1:2
     (H100, A100).
@@ -120,7 +157,7 @@ arithmetic's gain, with the cache's own gain removed.
 - **No data:** the RTX 5090 (n/a-by-capacity, two attempts of a pre-registered three) and the PRO
   6000's r2SCAN/B3LYP precision effect, which exists only on the CONTENTION-UNKNOWN C0 (1.543 /
   1.633) and is not claimed.
-- The H100 and L40S rows each rest on a single pod per cell.
+- The L40S row rests on a single pod per cell.
 
 ## C4. Accuracy: 17 of 18 downstream cells are within every ceiling `[N4, N7]`
 
@@ -147,11 +184,40 @@ arithmetic's gain, with the cache's own gain removed.
 - **Not covered:** the mode does not touch gradients or Hessians, which run stock. No geometry
   optimisation was run end to end.
 
-## C5. MIG (deployment advice, not a property of the library) `[N5, N6, N7]`
+## Deployment notes, not claims: MIG and a concurrent whole card `[N5, N6, N7, N8]`
+
+**This was C5. It is no longer a claim of the RFC.**
+- PREREG-7's decision rule, written before CC1 ran, said: if a whole card running four SCFs
+  concurrently reaches a throughput gain G ≥ 1.25 on both arms, MIG leaves the claims. It did.
+- The material below is advice for people deploying the mode. It is not a property of the library.
+
+**A concurrent whole card under MPS beats four MIG slices** (CC1, one RTX PRO 6000 Server Edition,
+the trio × {r2SCAN, B3LYP}). G4 = 4 × T_S / T_C4. T_S is one process doing the six cells one at a
+time; T_C4 is four processes doing them together, timed by makespan.
+
+| arm | serial T_S (s) | 4 processes, time-sliced | 4 processes under MPS | MIG projection (PREREG-5) |
+|---|---|---|---|---|
+| stock | 51.20 | 0.96 | **1.52** | 1.333 / 1.363 |
+| mixed | 29.19 | 1.02 | **1.75** | 1.340 / 1.363 |
+
+- **Without MPS, four concurrent processes gain nothing.** That missed the prediction of 1.3–1.4.
+  **MPS adds +0.56 and +0.73**, beyond the predicted 0 to +0.3. All four are MODEL-MISSes.
+- MPS really engaged: the server process was seen in both MPS phases. No phase ran out of memory.
+  Every mixed SCF under four processes kept the `fp64+fp32` tier, and every B3LYP tensor stayed on
+  the device.
+- **The memory pool was freed after every SCF in CC1**, in all its phases, so that four processes
+  could share the card. That departs from the warm-pool rule used everywhere else.
+- **Timing definition.** T uses each SCF's span, which includes building the molecule and the SCF
+  object. The MIG figures use kernel walls.
+- **Not measured: true four-instance MIG concurrency.** RunPod could not place four 1g.24gb pods on
+  one card, so the MIG figure is still a projection.
+- **Advice.** For throughput of many small SCFs on one card, run them concurrently under MPS. Use
+  MIG only where isolation is the point.
+
+### MIG, as measured (the former C5)
 
 **MIG gain** = 4 × whole-card wall / one-instance wall. The whole card is an RTX PRO 6000 Server
-Edition running **one SCF at a time**. Four concurrent SCFs (or MPS) on the whole card were not
-measured, and that is the comparison an operator would face.
+Edition running **one SCF at a time**. That is not the comparison an operator faces; see the CC1 table above.
 
 | | trio stock (M1 / M2) | trio mixed (M1 / M2) | 475–559 Da stock | 475–559 Da mixed |
 |---|---|---|---|---|
@@ -175,26 +241,40 @@ measured, and that is the comparison an operator would face.
   - These limits are for unpruned grids, and pruning would move them.
 - CPU and host RAM per pod were not recorded.
 
-## Cold start
+## Cold start: the CUDA driver's JIT cache, paid once per machine `[N7, N8]`
 
-**On a fresh pod, the first `mixed` SCF is slow.**
-- On Blackwell (whole cards and MIG instances) it took **64–168 s**, against warm walls of 1–108 s
-  for the same cells.
+**On a fresh pod, the first SCF is slow.**
+- On Blackwell (whole cards and MIG instances), the first mixed SCF took **64–168 s**, against warm
+  walls of 1–108 s for the same cells.
 - On the L40S, H100 and A100, the same first run was about 6–10 s slower than warm.
 
-**It is paid once per pod, not once per process.** Each functional group ran in a fresh process.
-Later groups on the same pod paid little: on C0, B3LYP's first mixed run took 1.7 s against 1.2 s
-warm, and wB97M-V's 15.3 s against 13.8 s. Stock's cold pair is not slow. That pattern is
-consistent with a kernel-compilation cache that persists across processes on the same machine, but
-it was not established.
+**What causes it** (PREREG-7 CS1, paracetamol; all five pre-registered thresholds met). Each phase
+is a fresh process with the caches as shown. Cold extra = cold wall − warm wall:
 
-**Mixed ran first in each pair**, so the first run may also absorb shared start-up costs; the
-attribution was not separated. On a fresh machine or container, the first SCF can therefore be a
-net loss. The gains above are steady-state figures.
+| phase | caches at start | arm | r2SCAN cold extra (s) |
+|---|---|---|---|
+| P1 | both empty | **stock** | **134.0** |
+| P2 | as P1 left them | mixed | 1.86 |
+| P3 | as P2 left them | mixed | 0.81 |
+| P4 | CuPy kernel cache wiped | mixed | 9.93 |
+| P5 | CUDA driver cache wiped | mixed | **125.7** |
+
+- **It is the driver JIT-compiling gpu4pyscf's PTX.** The gpu4pyscf-cuda12x 1.8.1 wheel is built
+  for `70-real;80;90-real`, so on sm_120 the driver compiles compute_80 PTX on first load. P1
+  leaves 60 files, 128 MB, in `CUDA_CACHE_PATH`. Wiping that cache brings back about 126 s; wiping
+  CuPy's costs about 10 s.
+- **It is not the mode's cost.** The stock arm paid it first (P1), and the mixed arm then paid under
+  2 s (P2). In the campaign pods the mixed arm ran first in each pair, which is why the cost showed
+  up there.
+- **It is charged to whichever functional runs first in a process.** r2SCAN ran first in every
+  phase, so the other functionals' small extras (≤ 1.62 s) say nothing about their own kernels.
+- **Remedy.** Keep `CUDA_CACHE_PATH` on persistent storage, or ship a wheel that includes sm_120
+  code. The campaign's speed figures exclude the cold pair, so they are steady-state figures either
+  way.
 
 ## What can and cannot be verified from this package
 
-- **Can, with nothing but this directory** (`verify_native.py`, 498 checks):
+- **Can, with nothing but this directory** (`verify_native.py`, 640 checks):
   - every number in this file, recomputed from the per-run CSVs;
   - every per-run CSV, re-extracted from the pod's own result file (`provenance/sentinels/`) by the
     shipped extractor, column for column;
@@ -213,9 +293,10 @@ net loss. The gains above are steady-state figures.
     times are git committer times and the run times come from a private repository's Actions API.
     Two governing amendments (PREREG-0 Amendment 3, PREREG-6 Amendment 1) were committed only 17 s
     and 87 s before the dispatches they govern, on a results branch; the dispatched code does not
-    contain them.
-  - **The exact harness bytes.** `provenance/harness/` is the harness at `cab1dcc7`; each pod ran
-    at the earlier commit listed in `pods.csv`.
+    contain them. PREREG-7's final text, by contrast, is in the commit every PREREG-7 pod ran
+    (`d05888b8`), 7.5 min before the first dispatch.
+  - **The exact harness bytes.** `provenance/harness/` is the harness at `d05888b8`, the commit
+    the PREREG-7 pods ran. Every earlier pod ran at the earlier commit listed in `pods.csv`.
 - **Dates.** A few status dates and one RESULT date in `prereg/` are a day late. See the ledger.
 - **`reproduce_native.py`** transcribes the measurement path and has not been run on a GPU in this
   form.
@@ -230,7 +311,7 @@ net loss. The gains above are steady-state figures.
   - UKS and multi-GPU;
   - the RTX 5090;
   - MIG profiles other than 1g.24gb;
-  - concurrent instances, and a concurrent whole card;
+  - four MIG instances running concurrently on one card;
   - wB97M-V on a MIG instance above 259 Da.
 - **Not transferable:** timings on one card model say nothing about another. The PRO 6000
   Workstation and Server Editions are treated as different models (five models in all: PRO 6000 WS,
@@ -254,6 +335,15 @@ net loss. The gains above are steady-state figures.
   B3LYP (above); stock paracetamol B3LYP and wB97M-V (vs the per-molecule table, which PREREG-5's
   RESULT decided to apply to every functional); M0 B3LYP against C0.
 - PREREG-6: B3LYP sildenafil mixed MIG gain (above).
+- PREREG-7:
+  - ST1 (c): the cache arm's XC is not faster than stock's at sildenafil B3LYP (10.324 s vs
+    10.319 s);
+  - ST2: FP32 K was predicted to harm on a MIG slice, but J/K stock/mixed is 1.09 (ST2r);
+  - CC1: G4 stock 0.96 and mixed 1.02, against predictions of 1.3 and 1.4; the MPS uplift of +0.56
+    and +0.73, against a prediction of 0 to +0.3.
+
+**Replication falsifier fired:** PREREG-7 X3r. H100 B3LYP mixed/stock moved by 0.115 (> 0.10), so it
+is quoted as the range 0.905–1.021. The L12 replication's falsifier did not fire.
 
 **Wrong or withdrawn predictions:**
 - PREREG-6: the three r2SCAN DF-placement predictions (withdrawn by Amendment 1: no tensor is
@@ -275,9 +365,21 @@ listed numbers are checked by `verify_native.py`:
 | PREREG-5, r2SCAN stock MIG gain range | 1.4–1.6 | 1.35–1.55 |
 | PREREG-5 RESULT date; PREREG-6 "Status" and "Owner decision" dates | 2026-10-06 | committed 2026-10-05 (PREREG-6's RESULT date, 2026-10-06, is correct) |
 | PREREG-5, "A sustained ~18 % throughput gain at scale is material" | — | added after the data; "at scale" contradicts the untested concurrency assumption, so withdrawn |
+| PREREG-7 RESULT, CS1 cold extras: P1 wB97M-V, P2 wB97M-V, P4 r2SCAN, P4 B3LYP | 0.64, 1.13, 9.92, 1.61 | 0.65, 1.12, 9.93, 1.60 (computed from rounded readings; erratum in the protocol) |
+| PREREG-7 RESULT, X3r − X3: B3LYP mixed/stock; r2SCAN precision effect | 0.116; 0.000 | 0.115; −0.001 |
+| PREREG-7 RESULT, "DF build and eigensolver the same in every arm" | — | within 5 %, except r2SCAN's ~0.05 s DF-build call (up to 9 %, ≤ 5 ms) |
 
 **Procedural lapses:**
 - The RTX 5090's third capacity attempt was not made inside its window.
 - X4's DEGRADED flag was missed at first, so its re-run came three days later.
 - PREREG-0 §6's "two infra-starved repeats" rule was extended to two DEGRADED A100 pods.
 - The contention rule was written after its first case had been seen.
+- **`provenance/TIMELINE.csv` was missing from the first version of this package.** The README
+  described it, but the repository's `*.csv` ignore rule kept it out of git. It is now shipped,
+  regenerated from the same sources. The regenerated file reproduces every row of the unshipped one.
+- **L12r was re-dispatched as L12r2 without asking the owner first.** PREREG-0 §3 requires the
+  re-dispatch. For X4, the owner had been asked.
+- **L12r, L12r2 and ST1 drew the same physical card.** That was not controlled.
+- **PREREG-0 §6's two-repeats rule was again applied to two DEGRADED pods**, here L12r and L12r2.
+- **The ST2 re-run was approved on 2026-10-07, after CC1 had been dispatched.** That changed the
+  dispatch order, CS1 → L12r → L12r2 → X3r → ST1 → ST2 → CC1 → ST2r, but no protocol text.

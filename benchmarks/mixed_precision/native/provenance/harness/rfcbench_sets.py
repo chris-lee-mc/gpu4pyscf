@@ -31,7 +31,10 @@ CUTENSOR_PIN = "cutensor-cu12==2.3.1"                       # as runpod_scfbench
 # modes, arms, functionals, bases
 # --------------------------------------------------------------------------------------------- #
 MODES = ("commission", "ladder", "cross", "large", "basis", "downstream", "mig", "migfit",
-         "gputypes")
+         "coldstart", "stages", "concur", "gputypes")
+# PREREG-rfcbench-7: modes whose pod runs rfcbench_extra (process-level phases) instead of the
+# per-group cell runner. Their cells name WHAT is run; rfcbench_extra.plan decides HOW.
+EXTRA_MODES = ("coldstart", "stages", "concur")
 # PREREG-0 section 2: a CACHE_FALLBACK / NOT_TREATED cell is a FAIL here ...
 FALLBACK_FAIL_MODES = ("commission", "ladder", "cross", "downstream")
 # ... and a pre-registered outcome (kept, listed in the fit table, out of the treated aggregates) here.
@@ -169,7 +172,9 @@ CROSS_CLASSES = ("5090", "l40s", "h100", "a100")
 MODE_CLASSES = {
     "commission": ("pro6000",), "ladder": ("pro6000",), "large": ("pro6000",),
     "basis": ("pro6000",), "downstream": ("pro6000",), "cross": CROSS_CLASSES,
-    "mig": (MIG_CLASS, "pro6000se"), "migfit": (MIG_CLASS, "pro6000se"), "gputypes": (),
+    "mig": (MIG_CLASS, "pro6000se"), "migfit": (MIG_CLASS, "pro6000se"),
+    "coldstart": ("pro6000",), "stages": ("pro6000", MIG_CLASS), "concur": ("pro6000se",),
+    "gputypes": (),
 }
 
 # PREREG-rfcbench-6: where one 1g.24gb instance stops holding the treated path. Three LARGE molecules
@@ -177,6 +182,12 @@ MODE_CLASSES = {
 # inside one instance pod's work cap). Mixed and stock arms; the fit is an outcome, not a failure.
 MIGFIT_MOLS = ("sildenafil", "imatinib", "atorvastatin")
 MIGFIT_XCS = ("r2scan", "b3lyp")
+
+# PREREG-rfcbench-7 stage timing: B3LYP across the sizes where its gain falls, r2SCAN as the contrast.
+STAGES_B3LYP_MOLS = ("paracetamol", "celecoxib", "sildenafil", "atorvastatin")
+STAGES_R2SCAN_MOLS = ("celecoxib", "sildenafil")
+# Concurrency: processes sharing one whole card.
+CONCUR_PROCS = 4
 
 # --------------------------------------------------------------------------------------------- #
 # cells
@@ -228,6 +239,13 @@ def mode_cells(mode: str) -> list:
                 + [_cell("speed", m, VV10_XC) for m in ("paracetamol", "propranolol")])
     if mode == "migfit":
         return [_cell("speed", m, x) for x in MIGFIT_XCS for m in MIGFIT_MOLS]
+    if mode == "coldstart":
+        return [_cell("speed", "paracetamol", x) for x in XCS]
+    if mode == "stages":
+        return ([_cell("speed", m, "b3lyp", arms=ARM_ORDER) for m in STAGES_B3LYP_MOLS]
+                + [_cell("speed", m, "r2scan", arms=ARM_ORDER) for m in STAGES_R2SCAN_MOLS])
+    if mode == "concur":
+        return [_cell("speed", m, x) for x in ("r2scan", "b3lyp") for m in TRIO]
     return []
 
 
@@ -483,4 +501,14 @@ MIGFIT_POD_PLAN = (
     ("F0", "migfit", "pro6000se", (), (), False),
     ("F1a", "migfit", "pro6000mig", (), ("r2scan",), False),
     ("F1b", "migfit", "pro6000mig", (), ("b3lyp",), False),
+)
+
+# PREREG-rfcbench-7: one pod each, in this order.
+PREREG7_POD_PLAN = (
+    ("CS1", "coldstart", "pro6000", (), (), False),
+    ("L12r", "ladder", "pro6000", (), ("r2scan", "b3lyp"), True),
+    ("X3r", "cross", "h100", (), (), False),
+    ("ST1", "stages", "pro6000", (), (), False),
+    ("ST2", "stages", "pro6000mig", ("celecoxib", "sildenafil"), ("b3lyp",), False),
+    ("CC1", "concur", "pro6000se", (), (), False),
 )

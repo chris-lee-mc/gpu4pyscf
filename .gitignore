@@ -26,6 +26,7 @@ output/
 # the mixed-precision evidence bundle is data, not output
 !benchmarks/mixed_precision/data/*.csv
 !benchmarks/mixed_precision/native/data/*.csv
+!benchmarks/mixed_precision/native/provenance/TIMELINE.csv
 dockerfiles/manylinux/wheelhouse
 gpu4pyscf/lib/bin
 gpu4pyscf/lib/build

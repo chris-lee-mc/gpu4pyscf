@@ -178,7 +178,8 @@ def contention(pod):
     """(contended, idle_w): contended is True/False, or None when the pod recorded no readable
     pre-work power (C0 predates the telemetry). Never raises."""
     try:
-        st = (pod.get("groups") or [{}])[0].get("gpu_state_before") or {}
+        first = (pod.get("groups") or ((pod.get("extra") or {}).get("phases")) or [{}])[0]
+        st = first.get("gpu_state_before") or {}
         w = float(st["power.draw"])
     except Exception:
         return None, None
@@ -193,6 +194,14 @@ def extract(text, run_id, unquotable=False):
     if why and not unquotable:
         raise RefusedSentinel(f"not quotable ({'; '.join(why)}); pass --unquotable to read it "
                               f"with every number labelled UNQUOTABLE")
+    if pod.get("extra"):                         # PREREG-rfcbench-7 extra modes
+        ex = pod["extra"]
+        c, idle = contention(pod)
+        return {"header": header, "status": header.get("STATUS"), "quotable": not why,
+                "unquotable_why": why, "mode": (pod.get("cfg") or {}).get("mode"),
+                "readings": ex.get("readings"), "phases": ex.get("phases"),
+                "skipped": ex.get("skipped"), "scfs": len(ex.get("runs") or []),
+                "contended": c, "idle_power_w": idle}
     repeats = repeats_of(header, pod)
     verdicts = {v["key"]: v for v in pod.get("cells") or []}
     requested = pod.get("cells_requested") or []
@@ -264,6 +273,26 @@ CSV_FIELDS = ("run_id", "key", "pair", "run", "arm", "wall_s", "e", "cycles", "c
               "ao_cache_bytes64", "ao_cache_bytes32", "cderi_types", "cderi_bytes", "error")
 
 
+# PREREG-rfcbench-7 extra modes: one row per SCF of rfcbench_extra (RFCBENCH_JSON "extra").
+EXTRA_CSV_FIELDS = ("run_id", "phase", "proc", "seq", "pair", "mol", "xc", "basis", "arm", "wall_s",
+                    "t0", "t1", "e", "cycles", "converged", "tier", "xc_s", "jk_s", "dfbuild_s",
+                    "eig_s", "nlc_s", "xc_n", "jk_n", "dfbuild_n", "eig_n", "error")
+
+
+def extra_rows(text, run_id):
+    _, _, pod = parse(text, run_id)
+    extra = pod.get("extra")
+    if not extra:
+        raise RefusedSentinel("no 'extra' record: not a PREREG-rfcbench-7 extra-mode sentinel")
+    for r in extra.get("runs") or []:
+        st = r.get("stages") or {}
+        row = {k: r.get(k) for k in EXTRA_CSV_FIELDS if k not in ("run_id",)}
+        row.update({k: st.get(k) for k in ("xc_s", "jk_s", "dfbuild_s", "eig_s", "nlc_s",
+                                           "xc_n", "jk_n", "dfbuild_n", "eig_n")})
+        row["run_id"] = run_id
+        yield row
+
+
 def csv_rows(text, run_id):
     _, runs, _ = parse(text, run_id)
     for key, rs in runs.items():
@@ -296,10 +325,16 @@ def main(argv=None):
         print(f"REFUSED: {e}", file=sys.stderr)
         return 2
     if a.csv:
+        extra = (parse(text, a.run_id)[2] or {}).get("extra")
         with open(a.csv, "w", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=CSV_FIELDS)
-            w.writeheader()
-            w.writerows(csv_rows(text, a.run_id))
+            if extra:
+                w = csv.DictWriter(f, fieldnames=EXTRA_CSV_FIELDS)
+                w.writeheader()
+                w.writerows(extra_rows(text, a.run_id))
+            else:
+                w = csv.DictWriter(f, fieldnames=CSV_FIELDS)
+                w.writeheader()
+                w.writerows(csv_rows(text, a.run_id))
     print(json.dumps(out, indent=1, default=str))
     return 0
 

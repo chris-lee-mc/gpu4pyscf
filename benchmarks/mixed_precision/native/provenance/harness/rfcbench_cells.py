@@ -676,8 +676,10 @@ def _to_host(x):
     return x
 
 
-def build_and_run(atoms, cell, policy, kind="speed", init_guess=None):
-    """One fresh molecule + SCF object, timed sync-to-sync. Returns (mf, run_record)."""
+def build_and_run(atoms, cell, policy, kind="speed", init_guess=None, hook=None):
+    """One fresh molecule + SCF object, timed sync-to-sync. Returns (mf, run_record). `hook(mf)`, if
+    given, is called on the fully configured object just before the timed kernel (PREREG-rfcbench-7
+    stage timing); every campaign mode before it passes none."""
     import cupy
     import pyscf
     from gpu4pyscf.dft import rks
@@ -694,6 +696,8 @@ def build_and_run(atoms, cell, policy, kind="speed", init_guess=None):
     if init_guess is not None:
         mf.init_guess = init_guess
     mf.mixed_precision = policy
+    if hook is not None:
+        hook(mf)
     cupy.cuda.runtime.deviceSynchronize()
     t0 = time.perf_counter()
     e = mf.kernel()

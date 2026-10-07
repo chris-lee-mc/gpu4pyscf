@@ -188,7 +188,7 @@ not with the code on this branch. The branch is a native port of the same scheme
 `df/df_jk.py`, `dft/numint.py` and `scf/hf.py`). The VV10 kernel sources are byte-identical to the
 prototype's.
 Its own GPU validation is in `validation/`, as a correctness gate. The port's speed is measured
-in [`native/`](native/README.md): 33 pods with the fork's own code. Those runs used an unpruned
+in [`native/`](native/README.md): 41 pods with the fork's own code. Those runs used an unpruned
 grid, the FP64 AO cache and B3LYP `xc_switch_tol=3e-4`, not the library defaults; the defaults
 themselves are not measured.
 

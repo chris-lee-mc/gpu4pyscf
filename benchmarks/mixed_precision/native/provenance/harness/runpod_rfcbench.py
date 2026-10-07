@@ -251,6 +251,7 @@ DOCS = os.path.join(S.REPO_ROOT, "docs", "upstream")
 PREREG3_PATH = os.path.join(DOCS, "PREREG-rfcbench-3-large-basis.md")
 PREREG5_PATH = os.path.join(DOCS, "PREREG-rfcbench-5-mig.md")
 PREREG6_PATH = os.path.join(DOCS, "PREREG-rfcbench-6-mig-fit.md")
+PREREG7_PATH = os.path.join(DOCS, "PREREG-rfcbench-7-coldstart-stages-concurrency.md")
 
 
 def amendment_text(path) -> str:
@@ -288,6 +289,19 @@ def process_gate(mode: str, gpu: str):
                     f"amendment above RESULT (cascade={cascade!r})")
 
 
+def prereg7_gate():
+    """The PREREG-rfcbench-7 modes run only while that protocol is committed with no RESULT yet."""
+    try:
+        text = open(PREREG7_PATH).read()
+    except OSError:
+        raise SystemExit("::error::this mode is refused: PREREG-rfcbench-7 is not committed")
+    m = re.search(r"^## RESULT[ \t]*$", text, flags=re.M)
+    if not m:
+        raise SystemExit("::error::this mode is refused: PREREG-rfcbench-7 has no RESULT heading")
+    if text[m.end():].strip():
+        raise SystemExit("::error::this mode is refused: PREREG-rfcbench-7 already has a RESULT")
+
+
 def migfit_gate():
     """mode=migfit runs only while PREREG-rfcbench-6 is committed with no RESULT yet written, and its
     pre-registered text (above RESULT) names both cascade ids in backticks and every geometry SHA256
@@ -323,6 +337,8 @@ def resolve_cfg() -> dict:
     process_gate(mode, gpu)
     if mode == "migfit":
         migfit_gate()
+    if mode in S.EXTRA_MODES:
+        prereg7_gate()
     repo, sha = resolve_fork()
     adm = S.admissible(mode)
     mols = _list("RFCBENCH_MOLS", mode, adm["mols"])
@@ -349,16 +365,22 @@ def resolve_cfg() -> dict:
     for mol in sorted({c["mol"] for c in cells}):
         if not os.path.isfile(S.geometry_file(mol)):
             raise SystemExit(f"::error::{mol} has no committed geometry at {S.geometry_file(mol)}")
-    est = S.work_estimate_s(cells, repeats, gpu)
+    if mode in S.EXTRA_MODES:
+        import rfcbench_extra as XM
+        est = XM.estimate_s(mode, cells, gpu)
+        n_groups = len(XM.plan(mode, cells))
+    else:
+        est = S.work_estimate_s(cells, repeats, gpu)
+        n_groups = len(S.groups(cells))
     if est > BUDGET_LIMIT_S:
         raise SystemExit(
             f"::error::this dispatch's over-estimate is {est:.0f}s ({len(cells)} cells, "
-            f"{len(S.groups(cells))} groups, R={repeats}, gpu={gpu}), above WORK_CAP - "
+            f"{n_groups} groups, R={repeats}, gpu={gpu}), above WORK_CAP - "
             f"{BUDGET_MARGIN_S} = {BUDGET_LIMIT_S}s (PREREG-0 section 5). Split it: a narrower "
             f"RFCBENCH_MOLS / RFCBENCH_XCS selects fewer cells.")
     return {"mode": mode, "gpu": gpu, "fork_repo": repo, "fork_sha": sha, "mols": mols,
             "xcs": xcs, "bases": bases, "bridge": bridge, "repeats": repeats, "cells": cells,
-            "n_groups": len(S.groups(cells)), "work_estimate_s": est}
+            "n_groups": n_groups, "work_estimate_s": est}
 
 
 def _csv(x):

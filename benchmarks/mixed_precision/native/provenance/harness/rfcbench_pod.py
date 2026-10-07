@@ -615,6 +615,12 @@ def main(env=None):
     for p in bad_geom.values():
         problem(p)
     probe_step(cfg)
+    if cfg["mode"] in S.EXTRA_MODES:            # PREREG-rfcbench-7: process-level phases
+        import rfcbench_extra as XM
+        if bad_geom:
+            return finish()
+        XM.measure(cfg, rec, emit, problem, lambda: remaining_s(cfg), gpu_state)
+        return finish()
     measure(cfg, bad_geom)
     return finish()
 

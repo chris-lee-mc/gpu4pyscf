@@ -42,6 +42,19 @@ KNOWN_DISCREPANCIES = {
         ("1.860", "PREREG-2 part 2 and PREREG-5 printed 1.859; the value is 1.8595"),
     ("N6", "MIG gain atorvastatin b3lyp stock"):
         ("1.10", "PREREG-6 RESULT printed 1.09 (twice); the value is 1.0950"),
+    # PREREG-7's RESULT computed these from the pod's 2-decimal readings, not from the walls.
+    ("N8", "CS1 P1_stock_first: wb97m-v cold extra (s)"):
+        ("0.65", "PREREG-7 RESULT printed 0.64 (difference of rounded walls); the value is 0.646"),
+    ("N8", "CS1 P2_mixed_first: wb97m-v cold extra (s)"):
+        ("1.12", "PREREG-7 RESULT printed 1.13 (difference of rounded walls); the value is 1.124"),
+    ("N8", "CS1 P4_mixed_wiped_cupy: r2scan cold extra (s)"):
+        ("9.93", "PREREG-7 RESULT printed 9.92 (difference of rounded walls); the value is 9.929"),
+    ("N8", "CS1 P4_mixed_wiped_cupy: b3lyp cold extra (s)"):
+        ("1.60", "PREREG-7 RESULT printed 1.61 (difference of rounded walls); the value is 1.604"),
+    ("N8", "X3r - X3, b3lyp mixed/stock"):
+        ("0.115", "PREREG-7 RESULT printed 0.116 (difference of rounded geomeans); still > 0.10"),
+    ("N8", "X3r - X3, r2scan mixed/cache"):
+        ("-0.001", "PREREG-7 RESULT printed 0.000 (difference of rounded geomeans)"),
 }
 
 
@@ -437,11 +450,12 @@ check_true("N6", "no r2SCAN run builds a DF tensor",
 # --------------------------------------------------------------------------------------------- #
 # Derived from the CSVs themselves (pods with speed rows), never from the pods.csv field it checks,
 # and pinned: a pod cannot drop out of these checks by editing its own flags.
-SPEED_PODS = sorted(r["csv"] for r in rows("pods") if any(x["key"].startswith("speed/") for x in rows(r["csv"])))
-check_true("N7", "the 29 speed pods are exactly the expected set",
-           lambda: SPEED_PODS == sorted(["b1", "c0", "c0w", "f0", "f1a", "f1b", "l12", "m0", "m1a", "m1b", "m2a",
-                                         "m2ar", "m2b", "m2br", "w1", "w2", "w3", "w4", "w4r", "w5", "x2a", "x2b",
-                                         "x3", "x4", "x4r", "xl1", "xl2", "xl3a", "xl3b"]))
+SPEED_PODS = sorted(r["csv"] for r in rows("pods")
+                    if any(x.get("key", "").startswith("speed/") for x in rows(r["csv"])))
+check_true("N7", "the 32 speed pods are exactly the expected set",
+           lambda: SPEED_PODS == sorted(["b1", "c0", "c0w", "f0", "f1a", "f1b", "l12", "l12r", "l12r2", "m0", "m1a",
+                                         "m1b", "m2a", "m2ar", "m2b", "m2br", "w1", "w2", "w3", "w4", "w4r", "w5",
+                                         "x2a", "x2b", "x3", "x3r", "x4", "x4r", "xl1", "xl2", "xl3a", "xl3b"]))
 
 
 def speed_keys(p):
@@ -466,12 +480,15 @@ def under_1s(p, k):
                if any(r["key"] == k and r["arm"] == a for r in rows(p)) for w in walls(p, k, a))
 
 
-check_true("N7", "exactly six cells have a warm wall under 1 s, all B3LYP (metformin, paracetamol)",
+check_true("N7", "exactly eleven cells have a warm wall under 1 s, all B3LYP (metformin, paracetamol)",
            lambda: sorted((p["csv"], k) for p in rows("pods") if int(p["speed_cells"]) > 0
                           for k in speed_keys(p["csv"]) if under_1s(p["csv"], k)) == sorted([
                ("l12", cell("metformin", "b3lyp")), ("b1", cell("paracetamol", "b3lyp", "svp")),
                ("b1", cell("paracetamol", "b3lyp", "mtzvpp")), ("x3", cell("paracetamol", "b3lyp")),
-               ("x4", cell("paracetamol", "b3lyp")), ("x4r", cell("paracetamol", "b3lyp"))]))
+               ("x4", cell("paracetamol", "b3lyp")), ("x4r", cell("paracetamol", "b3lyp")),
+               ("l12r", cell("metformin", "b3lyp")), ("l12r", cell("paracetamol", "b3lyp")),
+               ("l12r2", cell("metformin", "b3lyp")), ("l12r2", cell("paracetamol", "b3lyp")),
+               ("x3r", cell("paracetamol", "b3lyp"))]))
 check_true("N7", "XL: r2SCAN/B3LYP mixed at fp64+fp32, wB97M-V at fp64",
            lambda: {t for _, t in tiers_of(("xl1", "xl2"))} == {"fp64+fp32"}
            and {t for _, t in tiers_of(("xl3a", "xl3b"))} == {"fp64"})
@@ -539,7 +556,7 @@ check_true("N7", "CONTENDED <=> idle power > 200 W, on every pod but C0; C0 has 
            lambda: all((r["contended"] == "True") == (float(r["idle_power_w"]) > 200.0)
                        for r in rows("pods") if r["csv"] != "c0")
            and (pod("c0")["contended"], pod("c0")["idle_power_w"]) == ("", "")
-           and sorted(r["csv"] for r in rows("pods") if r["contended"] == "True") == ["m2a", "m2b", "w4"])
+           and sorted(r["csv"] for r in rows("pods") if r["contended"] == "True") == ["m2a", "m2b", "st2", "w4"])
 
 # Treatment evidence and the accuracy gates, re-derived on every speed and bridge row of every pod.
 POLICY = {
@@ -594,7 +611,7 @@ def gate_worst():
 
 check_true("N7", "accuracy gates on every timed pair: |E_arm - E_stock| <= 1e-8 Ha and |cycles| within 1",
            lambda: gate_worst()[0] <= 1e-8 and gate_worst()[1] <= 1)
-check("N7", "worst |E_arm - E_stock| over every timed pair (Ha)", lambda: gate_worst()[0], "1.74e-10")
+check("N7", "worst |E_arm - E_stock| over every timed pair (Ha)", lambda: gate_worst()[0], "1.75e-10")
 
 
 # Cold start: the first group of a pod pays it, later groups (fresh processes, same pod) do not.
@@ -633,6 +650,8 @@ check_true("P", "every speed CSV row carries its pod's RUN_ID",
 # P2. Provenance: every CSV re-extracted from its shipped sentinel by the shipped extractor
 # --------------------------------------------------------------------------------------------- #
 PROV = os.path.join(HERE, "provenance")
+# PREREG-7's extra-mode pods, pinned (their CSVs have no `key` column).
+EXTRA_PODS = ("cc1", "cs1", "st1", "st2", "st2r")
 
 
 def _extractor():
@@ -656,15 +675,21 @@ def _sha(b):
 
 def _reextracted_matches(name):
     """The CSV in data/ equals, column for column, what the shipped extractor writes from the shipped
-    sentinel (columns the CSV carries; older CSVs predate the cderi_* columns)."""
+    sentinel (columns the CSV carries; older CSVs predate the cderi_* columns). PREREG-7's extra
+    modes (one row per SCF, with stage timers) go through the extractor's extra-mode writer."""
     import io
     X = _extractor()
     p = pod(name)
     text = _sentinel(name).decode()
     buf = io.StringIO()
-    w = csv.DictWriter(buf, fieldnames=X.CSV_FIELDS)
-    w.writeheader()
-    w.writerows(X.csv_rows(text, p["run_id"]))
+    if name in EXTRA_PODS:
+        w = csv.DictWriter(buf, fieldnames=X.EXTRA_CSV_FIELDS)
+        w.writeheader()
+        w.writerows(X.extra_rows(text, p["run_id"]))
+    else:
+        w = csv.DictWriter(buf, fieldnames=X.CSV_FIELDS)
+        w.writeheader()
+        w.writerows(X.csv_rows(text, p["run_id"]))
     fresh = list(csv.DictReader(io.StringIO(buf.getvalue())))
     have = rows(name)
     if len(fresh) != len(have) or not have:
@@ -678,10 +703,14 @@ def _flags_match(name):
     p = pod(name)
     out = X.extract(_sentinel(name).decode(), p["run_id"], unquotable=True)
     c = out.get("contended")
-    return (out["status"] == p["status"]
-            and ("" if c is None else str(c)) == p["contended"]
-            and ("" if out.get("idle_power_w") is None else str(out["idle_power_w"])) == p["idle_power_w"]
-            and str(out["noisy"]) == p["noisy_cells"] and str(out["degraded"]) == p["degraded"]
+    common = (out["status"] == p["status"]
+              and ("" if c is None else str(c)) == p["contended"]
+              and ("" if out.get("idle_power_w") is None else str(out["idle_power_w"])) == p["idle_power_w"])
+    if name in EXTRA_PODS:   # no speed cells: the SCF count is the CSV's row count instead
+        return (common and out.get("mode") in ("coldstart", "stages", "concur")
+                and (p["speed_cells"], p["noisy_cells"], p["degraded"]) == ("0", "", "")
+                and out["scfs"] == len(rows(name)) > 0)
+    return (common and str(out["noisy"]) == p["noisy_cells"] and str(out["degraded"]) == p["degraded"]
             and str(len(out["cells"])) == p["speed_cells"])
 
 
@@ -716,6 +745,240 @@ for _p in rows("pods"):
 check_true("P2", "downstream.csv re-derived from the D1/D2/C0 sentinels is identical",
            _downstream_matches)
 
+# --------------------------------------------------------------------------------------------- #
+# N8. Cold start, replication, B3LYP stage timing and concurrency (PREREG-7)
+# --------------------------------------------------------------------------------------------- #
+# The extra-mode CSVs (cs1, st1, st2, st2r, cc1) carry one row per SCF: phase, proc, pair, t0/t1 and
+# exclusive stage timers. Pair 0 is the cold (or first-pass) run, pair 1 the warm (second-pass) one.
+def xrows(p, **kw):
+    out = [r for r in rows(p) if all(r[k] == v for k, v in kw.items())]
+    if not out:
+        raise LookupError(f"no rows in {p} for {kw}")
+    return out
+
+
+def xone(p, field, **kw):
+    return float(one({r[field] for r in xrows(p, **kw)}))
+
+
+def cold_extra(phase, x):
+    return lambda: (xone("cs1", "wall_s", phase=phase, xc=x, mol="paracetamol", pair="0")
+                    - xone("cs1", "wall_s", phase=phase, xc=x, mol="paracetamol", pair="1"))
+
+
+CS1 = {"P1_stock_first": ("134.0", "1.45", "0.64"), "P2_mixed_first": ("1.86", "0.19", "1.13"),
+       "P3_mixed_again": ("0.81", "0.01", "0.06"), "P4_mixed_wiped_cupy": ("9.92", "1.61", "1.62"),
+       "P5_mixed_wiped_cuda": ("125.7", "0.01", "0.18")}
+for ph, vals in CS1.items():
+    for x, v in zip(XCS3, vals):
+        check("N8", f"CS1 {ph}: {x} cold extra (s)", cold_extra(ph, x), v)
+check_true("N8", "CS1 thresholds: P1 and P5 r2SCAN >= 30 s; P2 and P4 all <= 15 s; P3 all <= 5 s",
+           lambda: cold_extra("P1_stock_first", "r2scan")() >= 30 and cold_extra("P5_mixed_wiped_cuda", "r2scan")() >= 30
+           and all(cold_extra(ph, x)() <= lim for ph, lim in (("P2_mixed_first", 15), ("P4_mixed_wiped_cupy", 15),
+                                                              ("P3_mixed_again", 5)) for x in XCS3))
+check_true("N8", "CS1: r2SCAN runs first in every phase, so the cold cost is charged to it",
+           lambda: all(min(xrows("cs1", phase=ph), key=lambda r: int(r["seq"]))["xc"] == "r2scan" for ph in CS1))
+
+
+def _cs1_cache(phase, which):
+    X = _extractor()
+    ph = [q for q in X.extract(_sentinel("cs1").decode(), pod("cs1")["run_id"], unquotable=True)["phases"]
+          if q["phase"] == phase]
+    return one({(ph[0][which]["files"], ph[0][which]["bytes"])}) if len(ph) == 1 else None
+
+
+check_true("N8", "CS1: P1 leaves the driver JIT cache at 60 files and 127,910,485 bytes (128 MB)",
+           lambda: _cs1_cache("P1_stock_first", "cuda_cache") == (60, 127910485))
+
+# L12r / L12r2: the L12 replication. Both DEGRADED, so clean cells are reported (PREREG-0 sec. 6).
+L12R = ("l12r", "l12r2")
+for p, (r2, b3) in {"l12r": ("1.721", "1.844"), "l12r2": ("1.718", "1.868")}.items():
+    check("N8", f"{p} r2SCAN ladder geomean, all 24", gm_ratio(p, "r2scan"), r2)
+    check("N8", f"{p} B3LYP ladder geomean, all 24", gm_ratio(p, "b3lyp"), b3)
+
+
+def gm_clean(pods, p, x):
+    ks = [k for k in keys(p, xc=x) if not any(noisy(q, k) for q in pods)]
+    return geomean(ratio(p, k, "mixed", "stock") for k in ks), len(ks)
+
+
+for p, vals in {"l12r": (("1.717", 16), ("1.872", 13)), "l12r2": (("1.734", 16), ("1.873", 11))}.items():
+    for x, (v, n) in zip(("r2scan", "b3lyp"), vals):
+        check("N8", f"{p} {x} geomean over its own clean cells (n = {n})",
+              lambda p=p, x=x, n=n: gm_clean((p,), p, x)[0] if gm_clean((p,), p, x)[1] == n else -1, v)
+for p, vals in {"l12r": ("1.709", "1.830"), "l12r2": ("1.720", "1.818")}.items():
+    for x, v, n in zip(("r2scan", "b3lyp"), vals, (11, 5)):
+        check("N8", f"{p} {x} geomean over cells clean on both replicates (n = {n})",
+              lambda p=p, x=x, n=n: gm_clean(L12R, p, x)[0] if gm_clean(L12R, p, x)[1] == n else -1, v)
+check("N8", "L12 replication: largest |replicate - L12| over all, own-clean and both-clean geomeans",
+      lambda: max(abs(v - gm_ratio("l12", x)()) for x in ("r2scan", "b3lyp") for p in L12R
+                  for v in (gm_ratio(p, x)(), gm_clean((p,), p, x)[0], gm_clean(L12R, p, x)[0])), "0.090")
+check_true("N8", "L12r, L12r2 and ST1 ran on the same physical card (one GPU UUID in all three sentinels)",
+           lambda: len({_sentinel(p).decode().split('"listing":["GPU 0: ')[1].split("UUID: ")[1][:12]
+                        for p in ("l12r", "l12r2", "st1")}) == 1)
+check("N8", "L12r/L12r2 r2SCAN per-cell mixed/stock, lowest", lambda: min(ratio(p, k, "mixed", "stock")
+      for p in L12R for k in keys(p, xc="r2scan")), "1.55")
+check("N8", "L12r/L12r2 r2SCAN per-cell mixed/stock, highest", lambda: max(ratio(p, k, "mixed", "stock")
+      for p in L12R for k in keys(p, xc="r2scan")), "2.02")
+check("N8", "L12r/L12r2 B3LYP per-cell mixed/stock, lowest", lambda: min(ratio(p, k, "mixed", "stock")
+      for p in L12R for k in keys(p, xc="b3lyp")), "1.26")
+check("N8", "L12r/L12r2 B3LYP per-cell mixed/stock, highest", lambda: max(ratio(p, k, "mixed", "stock")
+      for p in L12R for k in keys(p, xc="b3lyp")), "2.13")
+
+# X3r: the H100 replication.
+X3R = {("r2scan", "mixed", "stock"): "1.398", ("b3lyp", "mixed", "stock"): "1.021",
+       ("wb97m-v", "mixed", "stock"): "0.615", ("r2scan", "mixed", "cache"): "1.084",
+       ("b3lyp", "mixed", "cache"): "0.764", ("wb97m-v", "mixed", "cache"): "0.563"}
+for (x, a, b), v in X3R.items():
+    check("N8", f"X3r H100 trio {x} {a}/{b}", gm_ratio("x3r", x, a, b, mols=TRIO), v)
+for (x, a, b), v in {("b3lyp", "mixed", "stock"): "0.116", ("r2scan", "mixed", "stock"): "0.078",
+                     ("wb97m-v", "mixed", "stock"): "0.038", ("r2scan", "mixed", "cache"): "0.000",
+                     ("b3lyp", "mixed", "cache"): "0.019", ("wb97m-v", "mixed", "cache"): "0.024"}.items():
+    check("N8", f"X3r - X3, {x} {a}/{b}",
+          lambda x=x, a=a, b=b: gm_ratio("x3r", x, a, b, mols=TRIO)() - gm_ratio("x3", x, a, b, mols=TRIO)(), v)
+check_true("N8", "X3r: only B3LYP mixed/stock moves by more than 0.10 (the replication falsifier fires once)",
+           lambda: [(x, a, b) for (x, a, b) in X3R if abs(gm_ratio("x3r", x, a, b, mols=TRIO)()
+                                                         - gm_ratio("x3", x, a, b, mols=TRIO)()) > 0.10]
+           == [("b3lyp", "mixed", "stock")])
+
+
+# ST1 / ST2 / ST2r: exclusive stage times, pair 1 only.
+def stage(p, mol, x, arm, st):
+    return xone(p, st, mol=mol, xc=x, arm=arm, pair="1")
+
+
+def st_ratio(p, mol, x, st, a="stock", b="mixed"):
+    return lambda: stage(p, mol, x, a, st) / stage(p, mol, x, b, st)
+
+
+def share(p, mol, x, st, arm="stock"):
+    return lambda: stage(p, mol, x, arm, st) / xone(p, "wall_s", mol=mol, xc=x, arm=arm, pair="1")
+
+
+ST = {("st1", "paracetamol", "b3lyp"): ("0.09", "2.56", "0.95", "0.91", "0.992"),
+      ("st1", "celecoxib", "b3lyp"): ("0.34", "3.12", "1.50", "0.94", "0.987"),
+      ("st1", "sildenafil", "b3lyp"): ("0.43", "1.99", "1.05", "1.00", "1.008"),
+      ("st1", "atorvastatin", "b3lyp"): ("0.50", "3.08", "1.07", "0.95", "1.000"),
+      ("st1", "celecoxib", "r2scan"): ("0.11", "2.06", "0.97", "0.92", "1.009"),
+      ("st1", "sildenafil", "r2scan"): ("0.11", "2.31", "1.04", "0.97", "0.974"),
+      ("st2r", "celecoxib", "b3lyp"): ("0.40", "3.80", "1.09", "0.95", "0.999"),
+      ("st2r", "sildenafil", "b3lyp"): ("0.48", "2.01", "1.17", "0.95", "1.001")}
+for (p, m, x), (jks, xcr, jkr, cxc, cjk) in ST.items():
+    check("N8", f"{p} {m} {x}: J/K share of the stock SCF", share(p, m, x, "jk_s"), jks)
+    check("N8", f"{p} {m} {x}: XC stock/mixed", st_ratio(p, m, x, "xc_s"), xcr)
+    check("N8", f"{p} {m} {x}: J/K stock/mixed", st_ratio(p, m, x, "jk_s"), jkr)
+    check("N8", f"{p} {m} {x}: cache XC / stock XC", st_ratio(p, m, x, "xc_s", "cache", "stock"), cxc)
+    check("N8", f"{p} {m} {x}: cache J/K / stock J/K", st_ratio(p, m, x, "jk_s", "cache", "stock"), cjk)
+check("N8", "ST1 r2SCAN celecoxib: XC share of the stock SCF", share("st1", "celecoxib", "r2scan", "xc_s"), "0.85")
+check("N8", "ST1 r2SCAN sildenafil: XC share of the stock SCF", share("st1", "sildenafil", "r2scan", "xc_s"), "0.86")
+check("N8", "ST1 sildenafil B3LYP: cache XC (s)", lambda: stage("st1", "sildenafil", "b3lyp", "cache", "xc_s"), "10.324")
+check("N8", "ST1 sildenafil B3LYP: stock XC (s)", lambda: stage("st1", "sildenafil", "b3lyp", "stock", "xc_s"), "10.319")
+for m, v in (("celecoxib", "1.08"), ("sildenafil", "1.16")):
+    check("N8", f"ST2 (CONTENDED) {m} B3LYP: J/K stock/mixed", st_ratio("st2", m, "b3lyp", "jk_s"), v)
+check_true("N8", "ST1, ST2, ST2r: DF build and eigensolver within 5 % (or 10 ms) of stock in every pair-1 cell",
+           lambda: all(abs(stage(p, m, x, a, st) / stage(p, m, x, "stock", st) - 1) <= 0.05
+                       or abs(stage(p, m, x, a, st) - stage(p, m, x, "stock", st)) <= 0.010
+                       for (p, m, x) in list(ST) + [("st2", "celecoxib", "b3lyp"), ("st2", "sildenafil", "b3lyp")]
+                       for a in ("mixed", "cache") for st in ("dfbuild_s", "eig_s")))
+check_true("N8", "ST1, ST2r: 'other' (wall minus timed stages) is <= 6 % of every stock SCF",
+           lambda: all(1 - sum(share(p, m, x, st)() for st in ("xc_s", "jk_s", "dfbuild_s", "eig_s")) <= 0.06
+                       for (p, m, x) in ST))
+check_true("N8", "on the slice, sildenafil B3LYP mixed is at tier fp32 with 22 XC entries (15 for stock and "
+           "cache); celecoxib is fp64+fp32",
+           lambda: all(xone(p, "xc_n", mol="sildenafil", xc="b3lyp", arm=a, pair="1") == n
+                       for p in ("st2", "st2r") for a, n in (("mixed", 22), ("stock", 15), ("cache", 15)))
+           and {r["tier"] for p in ("st2", "st2r") for r in xrows(p, mol="sildenafil", arm="mixed")} == {"fp32"}
+           and {r["tier"] for p in ("st2", "st2r") for r in xrows(p, mol="celecoxib", arm="mixed")} == {"fp64+fp32"})
+
+
+# CC1: G4 = 4 x T_S / T_C4. T_S = the serial phase's second pass, summed spans; T_C4 = makespan.
+def span(r):
+    return float(r["t1"]) - float(r["t0"])
+
+
+def t_s(arm):
+    return sum(span(r) for r in xrows("cc1", phase=f"S_{arm}", pair="1"))
+
+
+def t_c4(arm, mps=False):
+    rs = xrows("cc1", phase=f"C4_{arm}" + ("_mps" if mps else ""))
+    return max(float(r["t1"]) for r in rs) - min(float(r["t0"]) for r in rs)
+
+
+for arm, (ts, tc, g, tm, gm) in {"stock": ("51.20", "212.92", "0.96", "134.91", "1.52"),
+                                 "mixed": ("29.19", "114.63", "1.02", "66.70", "1.75")}.items():
+    check("N8", f"CC1 {arm}: T_S (s)", lambda arm=arm: t_s(arm), ts)
+    check("N8", f"CC1 {arm}: T_C4 makespan (s)", lambda arm=arm: t_c4(arm), tc)
+    check("N8", f"CC1 {arm}: G4", lambda arm=arm: 4 * t_s(arm) / t_c4(arm), g)
+    check("N8", f"CC1 {arm}: T_C4-MPS makespan (s)", lambda arm=arm: t_c4(arm, True), tm)
+    check("N8", f"CC1 {arm}: G4-MPS", lambda arm=arm: 4 * t_s(arm) / t_c4(arm, True), gm)
+check_true("N8", "CC1 decision rule: max(G4, G4-MPS) >= 1.25 for both arms, so C5 is dropped",
+           lambda: all(max(4 * t_s(a) / t_c4(a), 4 * t_s(a) / t_c4(a, True)) >= 1.25 for a in ("stock", "mixed")))
+check_true("N8", "CC1: six cells per process; four processes x six cells in every C4 phase; two passes in S",
+           lambda: all(len(xrows("cc1", phase=f"C4_{a}" + s)) == 24
+                       and {r["proc"] for r in xrows("cc1", phase=f"C4_{a}" + s)} == {"0", "1", "2", "3"}
+                       for a in ("stock", "mixed") for s in ("", "_mps"))
+           and all(len(xrows("cc1", phase=f"S_{a}", pair=q)) == 6 for a in ("stock", "mixed") for q in ("0", "1")))
+check_true("N8", "CC1: every mixed SCF in every phase keeps fp64+fp32 (four processes do not degrade the tier)",
+           lambda: {r["tier"] for r in rows("cc1") if r["arm"] == "mixed"} == {"fp64+fp32"})
+
+
+def _cc1_mps():
+    X = _extractor()
+    phs = X.extract(_sentinel("cc1").decode(), pod("cc1")["run_id"], unquotable=True)["phases"]
+    return {q["phase"]: q.get("mps_server_seen") for q in phs}
+
+
+check_true("N8", "CC1: MPS engaged (server process seen) in both MPS phases, and only there",
+           lambda: _cc1_mps() == {"S_mixed": None, "C4_mixed": None, "C4_mixed_mps": True,
+                                  "S_stock": None, "C4_stock": None, "C4_stock_mps": True})
+
+for arm, v in (("stock", "0.56"), ("mixed", "0.73")):
+    check("N8", f"CC1 {arm}: MPS uplift, G4-MPS - G4",
+          lambda arm=arm: 4 * t_s(arm) / t_c4(arm, True) - 4 * t_s(arm) / t_c4(arm), v)
+for x, v in zip(XCS3, ("1.290", "1.336", "1.092")):
+    check("N8", f"X3r H100 trio {x} cache/stock", gm_ratio("x3r", x, "cache", "stock", mols=TRIO), v)
+check("N8", "X3r H100 wB97M-V trio mixed/stock as a slowdown factor", lambda: 1 / gm_ratio("x3r", "wb97m-v", mols=TRIO)(),
+      "1.63")
+check("N8", "H100 paracetamol B3LYP median warm wall, any arm, X3 and X3r: lowest (s)",
+      lambda: min(med(p, cell("paracetamol", "b3lyp"), a) for p in ("x3", "x3r")
+                  for a in ("mixed", "cache", "stock")), "0.60")
+check("N8", "H100 paracetamol B3LYP median warm wall, any arm, X3 and X3r: highest (s)",
+      lambda: max(med(p, cell("paracetamol", "b3lyp"), a) for p in ("x3", "x3r")
+                  for a in ("mixed", "cache", "stock")), "0.99")
+check("N8", "CS1: largest cold extra of a functional that did not run first (s)",
+      lambda: max(cold_extra(ph, x)() for ph in CS1 for x in ("b3lyp", "wb97m-v")), "1.62")
+
+
+# PREREG-7 gates, re-derived: every SCF converged, and |E_arm - E_stock| <= 1e-8 Ha against the
+# pod's own stock energy for the same molecule and functional.
+def x_gate_worst():
+    worst, n = 0.0, 0
+    for p in EXTRA_PODS:
+        ref = {}
+        for r in rows(p):
+            if r["arm"] == "stock":
+                ref.setdefault((r["mol"], r["xc"]), float(r["e"]))
+        for r in rows(p):
+            if r["arm"] != "stock":
+                worst = max(worst, abs(float(r["e"]) - ref[(r["mol"], r["xc"])]))
+                n += 1
+    if not n:
+        raise ValueError("no extra-mode arm rows")
+    return worst
+
+
+check_true("N8", "PREREG-7 extra pods: every SCF converged with no error; every arm within 1e-8 Ha of stock",
+           lambda: all(r["converged"] == "True" and not r["error"] for p in EXTRA_PODS for r in rows(p))
+           and x_gate_worst() <= 1e-8)
+check_true("N8", "CS1 and ST1 (one process, 96 GB card): every mixed and cache SCF is at its full tier",
+           lambda: all(r["tier"] == ("fp64" if r["arm"] == "cache" or r["xc"] == "wb97m-v" else "fp64+fp32")
+                       for p in ("cs1", "st1") for r in rows(p) if r["arm"] != "stock"))
+check_true("N8", "PREREG-7 pods: ST2 is the only CONTENDED one; L12r and L12r2 are DEGRADED, X3r is not",
+           lambda: [p for p in ("cs1", "l12r", "l12r2", "x3r", "st1", "st2", "st2r", "cc1")
+                    if pod(p)["contended"] == "True"] == ["st2"]
+           and [pod(p)["degraded"] for p in ("l12r", "l12r2", "x3r")] == ["True", "True", "False"])
+
 
 def data_integrity():
     """Every file in data/ must be listed in data/SHA256SUMS with a matching hash, and every listed
@@ -740,7 +1003,7 @@ def data_integrity():
     return probs
 
 
-EXPECTED_CHECKS = 498   # pinned: a check that silently disappears (or appears) is a FAIL
+EXPECTED_CHECKS = 649   # pinned: a check that silently disappears (or appears) is a FAIL
 
 
 def main():
