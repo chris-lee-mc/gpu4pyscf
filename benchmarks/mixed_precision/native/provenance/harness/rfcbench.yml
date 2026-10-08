@@ -12,16 +12,16 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "commission | ladder | cross | large | basis | downstream | mig | migfit | coldstart | stages | concur | gputypes"
+        description: "commission | ladder | cross | large | basis | downstream | mig | migfit | coldstart | stages | concur | attrib | geoopt | gputypes"
         type: choice
         required: true
-        options: [commission, ladder, cross, large, basis, downstream, mig, migfit, coldstart, stages, concur, gputypes]
+        options: [commission, ladder, cross, large, basis, downstream, mig, migfit, coldstart, stages, concur, attrib, geoopt, gputypes]
       gpu:
         description: "pro6000 | 5090 | l40s | h100 | a100 | pro6000mig (blank = the mode's only class; cross needs one)"
         type: string
         default: ""
       fork_sha:
-        description: "Full 40-hex fork commit (its gpu4pyscf/ must equal VALIDATED_FORK_SHA's); blank only for gputypes"
+        description: "Full 40-hex fork commit (its gpu4pyscf/ must equal a VALIDATED_FORK_SHAS tree; attrib/geoopt need 09271907); blank only for gputypes"
         type: string
         default: ""
       fork_repo:

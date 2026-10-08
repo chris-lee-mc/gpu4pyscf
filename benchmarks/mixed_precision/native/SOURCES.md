@@ -15,15 +15,17 @@ against `data/pods.csv`.
   to the ones the pods read.
 
 `prereg/` mirrors `docs/upstream/PREREG-rfcbench-*.md` of `chris-lee-mc/gpu-conformer-engine`, including the errata (PR #229)
-PREREG-7's RESULT and errata from branch `claude/rfcbench-prereg7-results` (PR #231), and PREREG-4's
-erratum 2 from branch `claude/rfcbench-c4-erratum`. Both are ahead of that repository's `main` until
-merged.
+PREREG-7's RESULT and errata from branch `claude/rfcbench-prereg7-results` (PR #231), PREREG-4's
+erratum 2 from branch `claude/rfcbench-c4-erratum`, and PREREG-8's RESULT from branch
+`claude/prereg8-results` (PR #236). All three are ahead of that repository's `main` until merged.
 
 Fork under test: `chris-lee-mc/gpu4pyscf` at `63af0568d4fd19935bef51b7fd71f161a9cee56f`, overlaid
 on `gpu4pyscf-cuda12x==1.8.1` with the lock in `../requirements.lock` and `cutensor-cu12==2.3.1`.
 
 | CSV | scope | GitHub run | repo commit | card | MIG | idle W | contended | cells | NOISY | DEGRADED | status |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| `a1` | PREREG-8 A1 | `37734904781` | `5013b101` | RTX PRO 6000 Blackwell Workstation Edition | — | 65.06 | False | — (96 runs) | — | — | PASS |
+| `a2` | PREREG-8 A2 | `37736924342` | `5013b101` | RTX PRO 6000 Blackwell Workstation Edition | — | 53.15 | False | — (16 runs) | — | — | PASS |
 | `b1` | PREREG-3 B1 | `37061160282` | `3890e545` | RTX PRO 6000 Blackwell Workstation Edition | — | 39.42 | False | 24 | 2 | False | PASS |
 | `c0` | PREREG-2 C0 (commissioning; CONTENTION-UNKNOWN) | `36951733967` | `0ee605b6` | RTX PRO 6000 Blackwell Workstation Edition | — | unknown | unknown | 10 | 0 | False | PASS |
 | `c0w` | PREREG-2 C0w | `37044790110` | `3890e545` | RTX PRO 6000 Blackwell Workstation Edition | — | 25.5 | False | 3 | 0 | False | PASS |
@@ -36,6 +38,7 @@ on `gpu4pyscf-cuda12x==1.8.1` with the lock in `../requirements.lock` and `cuten
 | `f0` | PREREG-6 F0 | `37379456085` | `e9b75f37` | RTX PRO 6000 Blackwell Server Edition | — | 65.62 | False | 6 | 0 | False | PASS |
 | `f1a` | PREREG-6 F1a | `37382762854` | `e9b75f37` | RTX PRO 6000 Blackwell Server Edition | 1g.24gb | 92.84 | False | 3 | 0 | False | PASS |
 | `f1b` | PREREG-6 F1b | `37386887345` | `e9b75f37` | RTX PRO 6000 Blackwell Server Edition | 1g.24gb | 93.96 | False | 3 | 0 | False | PASS |
+| `g1` | PREREG-8 G1 | `37738477503` | `5013b101` | RTX PRO 6000 Blackwell Workstation Edition | — | 42.35 | False | — (9 runs) | — | — | PASS |
 | `l12` | PREREG-1 L12 | `36968109711` | `78a3412e` | RTX PRO 6000 Blackwell Workstation Edition | — | 78.11 | False | 48 | 0 | False | PASS |
 | `l12r` | PREREG-7 L12r (DEGRADED) | `37540378856` | `d05888b8` | RTX PRO 6000 Blackwell Workstation Edition | — | 53.77 | False | 48 | 19 | True | PASS |
 | `l12r2` | PREREG-7 L12r2 (DEGRADED) | `37544474854` | `d05888b8` | RTX PRO 6000 Blackwell Workstation Edition | — | 63.24 | False | 48 | 21 | True | PASS |
@@ -70,9 +73,14 @@ Speed cells only are counted under "cells". Downstream pods (D1, D2a–c) and C0
 are in `data/downstream.csv`. PREREG-7's extra-mode pods (CS1, ST1, ST2, ST2r, CC1) have no speed
 cells; their CSVs carry one row per SCF, with phase, process, span and exclusive stage timers, and
 are written by the same extractor (`extra_rows`).
+PREREG-8's pods (A1, A2, G1) ran fork `09271907` (`mixed-precision-geo`, validated by g4pport run
+`37725279648`). Their CSVs carry one row per arm. The full gradient and dipole vectors (A1, A2) and
+the per-step records (G1) are in the sentinels, and `verify_native.py` N10 reads them from there.
 
 **Not billed, so with no sentinel:**
 - the 5090 capacity refusals: runs `37064884792` and `37073071979`;
 - two M1a create refusals: a REST schema refusal, and run `37261679254` refused by the serialisation
   gate;
 - F0's two runner failures: runs `37369605244` and `37371256270`.
+- PREREG-8 A1's first dispatch: run `37728120899`. A pod was launched, but no sentinel was ever
+  written; the runner gave up at 4815 s.

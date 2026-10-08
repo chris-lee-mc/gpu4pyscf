@@ -51,7 +51,20 @@ settings (18 cells: r2SCAN, B3LYP, wB97M-V × 6 molecules):
   *closer* to a tight reference than stock did.
 - Against that tight reference, both stock and mixed carry the same 1e-6-scale residual. It comes
   from the default `conv_tol_grad`, not from precision
-  (`benchmarks/mixed_precision/native/CLAIMS.md` C4). See
+  (`benchmarks/mixed_precision/native/CLAIMS.md` C4).
+- At `conv_tol_grad = 3e-6` that residual falls 1.8–22×, for stock and mixed alike. Mixed then
+  tracks stock to ≤ 2.3e-8 Ha/Bohr (r2SCAN), ≤ 2.2e-7 (B3LYP) and ≤ 2.1e-8 (wB97M-V), with
+  identical cycle counts.
+
+**Geometry optimisation.** Three geomeTRIC optimisations ran through the gradient scanner, with
+stock gradients: paracetamol r2SCAN, paracetamol B3LYP and celecoxib r2SCAN.
+- The mixed SCF followed stock's trajectory: the same steps and the same SCF cycles per step, with
+  endpoints within 1e-5 Å of stock's.
+- Each mixed endpoint was certified by a stock SCF and gradient.
+- Warm-step SCF was 1.41–1.44× faster than stock, and the whole optimisation 1.19–1.30×
+  (`CLAIMS.md` C6).
+- For gradients and optimisations, `conv_tol_grad ≈ 3e-6` is recommended irrespective of this
+  mode. See
 `benchmarks/mixed_precision/README.md` for the data and the script that re-derives every
 aggregate.
 

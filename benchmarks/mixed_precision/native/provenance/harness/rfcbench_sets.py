@@ -20,8 +20,18 @@ REPO_ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))
 # --------------------------------------------------------------------------------------------- #
 # the measured tree
 # --------------------------------------------------------------------------------------------- #
-# PREREG-0: only a fork whose gpu4pyscf/ tree is byte-identical to this commit's may be measured.
-VALIDATED_FORK_SHA = "63af0568d4fd19935bef51b7fd71f161a9cee56f"
+# PREREG-0: only a fork whose gpu4pyscf/ tree is byte-identical to a validated commit's may be
+# measured. PREREG-rfcbench-8 replaced the single SHA with an ordered set: 63af0568 is the campaign
+# commit (PORT-PLAN-ao-cache RESULT), 09271907 is 63af0568 plus the two opt-in geometry-safety policy
+# fields (`diis_reset_at_switch`, `warm_start_gorb`), admitted after its own g4pport validation (V8).
+# The pod fetches every listed commit and records which one the fork's tree equals.
+VALIDATED_FORK_SHAS = ("63af0568d4fd19935bef51b7fd71f161a9cee56f",
+                       "09271907d51580104c7a4e8334a8f65efc1b5d2a")
+VALIDATED_FORK_SHA = VALIDATED_FORK_SHAS[0]          # back-compat alias: the campaign commit
+GEO_FORK_SHA = VALIDATED_FORK_SHAS[1]
+# Modes whose policy fields exist only on one validated tree: the pod refuses any other tree, and the
+# free runner (which cannot read trees) refuses any other fork SHA.
+MODE_REQUIRED_TREE = {"attrib": GEO_FORK_SHA, "geoopt": GEO_FORK_SHA}
 FORK_REPO_DEFAULT = "chris-lee-mc/gpu4pyscf"
 BASE_TAG = "v1.8.1"
 BASE_SHA = "5b284c258a4260baef80e3d150b4e7a81a9dbd57"     # gpu4pyscf v1.8.1 == the installed wheel
@@ -31,10 +41,13 @@ CUTENSOR_PIN = "cutensor-cu12==2.3.1"                       # as runpod_scfbench
 # modes, arms, functionals, bases
 # --------------------------------------------------------------------------------------------- #
 MODES = ("commission", "ladder", "cross", "large", "basis", "downstream", "mig", "migfit",
-         "coldstart", "stages", "concur", "gputypes")
+         "coldstart", "stages", "concur", "attrib", "geoopt", "gputypes")
 # PREREG-rfcbench-7: modes whose pod runs rfcbench_extra (process-level phases) instead of the
 # per-group cell runner. Their cells name WHAT is run; rfcbench_extra.plan decides HOW.
 EXTRA_MODES = ("coldstart", "stages", "concur")
+# PREREG-rfcbench-8: gradient-residual attribution and scanner geometry optimisations. They run on the
+# per-group cell runner, with their own cell kinds (`attrib`, `geoopt`) and judges.
+PREREG8_MODES = ("attrib", "geoopt")
 # PREREG-0 section 2: a CACHE_FALLBACK / NOT_TREATED cell is a FAIL here ...
 FALLBACK_FAIL_MODES = ("commission", "ladder", "cross", "downstream")
 # ... and a pre-registered outcome (kept, listed in the fit table, out of the treated aggregates) here.
@@ -64,6 +77,40 @@ BRIDGE_CONV_TOL_GRAD = 1e-5        # PREREG-1 bridge leg only
 REF_CONV_TOL = 1e-11
 REF_CONV_TOL_GRAD = 3e-6
 REF_MAX_CYCLE = 100
+# PREREG-8 tight reference R' and the tightened-gradient arms St / Mt.
+REFP_CONV_TOL = 1e-12
+REFP_CONV_TOL_GRAD = 1e-6
+REFP_MAX_CYCLE = 100
+TIGHT_CONV_TOL_GRAD = 3e-6
+
+# PREREG-8 A1/A2: the eight arms of an attrib cell, in run order. `Rp` is R' (ASCII, as `Sp` is S').
+# arm -> (policy variant or None for stock, SCF settings). A variant names rfcbench_cells'
+# `variant_kwargs`: the campaign mixed policy, alone or with one PREREG-8 field.
+_CAMPAIGN = {"conv_tol": CONV_TOL, "conv_tol_grad": None, "max_cycle": MAX_CYCLE}
+ATTRIB_ARMS = ("Rp", "R", "S", "S2", "St", "M", "Mt", "Md")
+ATTRIB_PLAN = {
+    "Rp": (None, {"conv_tol": REFP_CONV_TOL, "conv_tol_grad": REFP_CONV_TOL_GRAD,
+                  "max_cycle": REFP_MAX_CYCLE}),
+    "R": (None, {"conv_tol": REF_CONV_TOL, "conv_tol_grad": REF_CONV_TOL_GRAD,
+                 "max_cycle": REF_MAX_CYCLE}),
+    "S": (None, dict(_CAMPAIGN)),
+    "S2": (None, dict(_CAMPAIGN)),
+    "St": (None, dict(_CAMPAIGN, conv_tol_grad=TIGHT_CONV_TOL_GRAD)),
+    "M": ("mixed", dict(_CAMPAIGN)),
+    "Mt": ("mixed", dict(_CAMPAIGN, conv_tol_grad=TIGHT_CONV_TOL_GRAD)),
+    "Md": ("mixed_dreset", dict(_CAMPAIGN)),
+}
+# PREREG-8 G1: the three optimisations of a geoopt cell, in run order, all at the campaign settings.
+GEOOPT_ARMS = ("M0", "MW", "S")
+GEOOPT_VARIANT = {"M0": "mixed_ws0", "MW": "mixed_wsw", "S": None}
+GEOOPT_SETTINGS = dict(_CAMPAIGN)
+WARM_GORB_RECORD_ONLY = 1e-300       # M0: cannot trigger, only records the initial norm
+WARM_GORB_MW = 1e-2                  # MW: fixed before any data
+# The geomeTRIC run: P5's convergence set (l3bcomm.GEO_CONV, copied: this module is stdlib only).
+GEO_MAXSTEPS = 90
+GEO_CONV = {"convergence_energy": 1e-6, "convergence_grms": 3e-4, "convergence_gmax": 4.5e-4,
+            "convergence_drms": 1.2e-3, "convergence_dmax": 1.8e-3}
+GEOOPT_CELLS = (("paracetamol", "r2scan"), ("paracetamol", "b3lyp"), ("celecoxib", "r2scan"))
 
 REPEATS_DEFAULT = 3
 REPEATS_MIN = 2
@@ -174,6 +221,7 @@ MODE_CLASSES = {
     "basis": ("pro6000",), "downstream": ("pro6000",), "cross": CROSS_CLASSES,
     "mig": (MIG_CLASS, "pro6000se"), "migfit": (MIG_CLASS, "pro6000se"),
     "coldstart": ("pro6000",), "stages": ("pro6000", MIG_CLASS), "concur": ("pro6000se",),
+    "attrib": ("pro6000",), "geoopt": ("pro6000",),
     "gputypes": (),
 }
 
@@ -192,8 +240,9 @@ CONCUR_PROCS = 4
 # --------------------------------------------------------------------------------------------- #
 # cells
 # --------------------------------------------------------------------------------------------- #
-# A cell is a dict: {"kind": speed|bridge|downstream, "mol", "xc", "basis", "aux", "arms"}.
-# Its key is "kind/mol/xc/basis" and must be unique in a dispatch.
+# A cell is a dict: {"kind": speed|bridge|downstream|attrib|geoopt, "mol", "xc", "basis", "aux",
+# "arms"}. Its key is "kind/mol/xc/basis" and must be unique in a dispatch. An attrib / geoopt cell's
+# "arms" are the policy families it uses (mixed, stock); its runs are ATTRIB_ARMS / GEOOPT_ARMS.
 
 def arms_for(mode: str) -> tuple:
     if mode in CACHE_ARM_MODES:
@@ -246,6 +295,10 @@ def mode_cells(mode: str) -> list:
                 + [_cell("speed", m, "r2scan", arms=ARM_ORDER) for m in STAGES_R2SCAN_MOLS])
     if mode == "concur":
         return [_cell("speed", m, x) for x in ("r2scan", "b3lyp") for m in TRIO]
+    if mode == "attrib":
+        return [_cell("attrib", m, x) for x in XCS for m in DOWNSTREAM_MOLS]
+    if mode == "geoopt":
+        return [_cell("geoopt", m, x) for m, x in GEOOPT_CELLS]
     return []
 
 
@@ -262,10 +315,11 @@ def admissible(mode: str) -> dict:
 # Modes whose cell set is fixed by its PREREG: no filter may be given, with one exception per
 # FIXED_MODE_RERUNS: PREREG-rfcbench-0 Amendment 3's C0w re-run of C0's wB97M-V trio cells (all
 # three arms) after C0 was found CONTENTION-UNKNOWN.
-FIXED_MODES = ("commission",)
+FIXED_MODES = ("commission", "geoopt")
 FIXED_MODE_RERUNS = {("commission", "RFCBENCH_XCS"): ("wb97m-v",)}
 # Per-mode default filters (blank input). None = no filter, i.e. every cell of the mode.
-DEFAULT_XCS = {"ladder": ("r2scan", "b3lyp"), "large": ("r2scan",), "downstream": ("r2scan", "b3lyp")}
+DEFAULT_XCS = {"ladder": ("r2scan", "b3lyp"), "large": ("r2scan",), "downstream": ("r2scan", "b3lyp"),
+               "attrib": ("r2scan", "b3lyp")}
 
 
 def expand_mols(mode: str, names: list) -> list:
@@ -294,16 +348,18 @@ def select_cells(mode: str, mols=None, xcs=None, bases=None, bridge=False) -> li
 
 def groups(cells: list) -> list:
     """Cells grouped into subprocesses: one group per (kind, xc), in first-appearance order, with the
-    bridge group last. Each group runs in its own process under its own timeout."""
+    bridge group last. Each group runs in its own process under its own timeout. A geoopt cell is a
+    group of its own (PREREG-8): an optimisation that runs long can then only cap-kill itself, and
+    the cheaper cells listed before it are already banked."""
     order, by = [], {}
     for c in cells:
-        g = (c["kind"], c["xc"])
+        g = (c["kind"], c["xc"]) + ((c["mol"],) if c["kind"] == "geoopt" else ())
         if g not in by:
             by[g] = []
             order.append(g)
         by[g].append(c)
     order.sort(key=lambda g: g[0] == "bridge")
-    return [{"kind": k, "xc": x, "cells": by[(k, x)]} for k, x in order]
+    return [{"kind": g[0], "xc": g[1], "cells": by[g]} for g in order]
 
 
 # --------------------------------------------------------------------------------------------- #
@@ -346,6 +402,19 @@ def mixed_budget_speedup(gpu: str, xc: str) -> float:
 DS_REF_FACTOR = 1.6
 DS_ATOM_GUESS_FACTOR = 1.2
 DS_GRAD_FACTOR = 1.0
+# Attrib (PREREG-8): eight arms instead of downstream's four, so about twice its estimate. R' at
+# 1e-12 / 1e-6 is budgeted above R's 1.6x; St / Mt (conv_tol_grad 3e-6 against the default 3.16e-5)
+# at 1.3x their untightened arm; Md at one mixed wall; each of the eight gradients at one stock wall.
+ATTRIB_REFP_FACTOR = 2.0
+ATTRIB_TIGHT_FACTOR = 1.3
+# Geoopt (PREREG-8): every optimisation budgeted at GEO_EST_STEPS steps of GEO_STEP_FACTOR stock walls
+# (SCF + gradient), mixed arms at the STOCK wall (the warm-start penalty is the hypothesis, so no
+# speed-up is assumed). Measured: paracetamol took 23 (r2SCAN) and 26 (B3LYP) steps at 4.24 / 2.73 s
+# per stock step (PREREG-l3b-geo-endpoint, run 36288403071), i.e. 1.03 / 1.10 calibrated stock walls;
+# celecoxib ~16 s per stock step (0.85 walls). 30 steps is l3b's own budget (15-30 % over the observed
+# 23-26); celecoxib's step count is NOT measured. Each mixed endpoint adds one stock SCF + gradient.
+GEO_EST_STEPS = 30
+GEO_STEP_FACTOR = 1.3
 # Per subprocess: imports, first-touch NVRTC JIT, cold DF build (102.6 s measured on a KC=MISS pod).
 GROUP_COLD_S = 150.0
 # Once per pod: apt/pip install and clone (~300 s on a wheelhouse HIT), cuTENSOR pip, fork fetch,
@@ -442,6 +511,14 @@ def cell_estimate_s(cell: dict, repeats: int, gpu: str) -> float:
     if cell["kind"] == "downstream":
         return (w * DS_REF_FACTOR + w + w * DS_ATOM_GUESS_FACTOR + mixed
                 + 4 * w * DS_GRAD_FACTOR)
+    if cell["kind"] == "attrib":            # Rp, R, S, S2, St; M, Mt, Md; eight gradients
+        return (w * (ATTRIB_REFP_FACTOR + DS_REF_FACTOR + 1.0 + 1.0 + ATTRIB_TIGHT_FACTOR)
+                + mixed * (1.0 + ATTRIB_TIGHT_FACTOR + 1.0)
+                + len(ATTRIB_ARMS) * w * DS_GRAD_FACTOR)
+    if cell["kind"] == "geoopt":            # three optimisations + two stock endpoint certificates
+        n_mixed = sum(1 for v in GEOOPT_VARIANT.values() if v)
+        return (len(GEOOPT_ARMS) * GEO_EST_STEPS * GEO_STEP_FACTOR * w
+                + n_mixed * (w + w * DS_GRAD_FACTOR))
     per_pair = sum({"mixed": mixed, "cache": cache, "stock": w}[a] for a in cell["arms"])
     pairs = 1 if cell["kind"] == "bridge" else 1 + int(repeats)
     return pairs * per_pair
@@ -511,4 +588,14 @@ PREREG7_POD_PLAN = (
     ("ST1", "stages", "pro6000", (), (), False),
     ("ST2", "stages", "pro6000mig", ("celecoxib", "sildenafil"), ("b3lyp",), False),
     ("CC1", "concur", "pro6000se", (), (), False),
+)
+
+# PREREG-rfcbench-8: one pod each, in this order (after V8, the g4pport validation of 09271907, which
+# is its own workflow). Each pod's fork SHA must be GEO_FORK_SHA.
+PREREG8_POD_PLAN = (
+    ("A1", "attrib", "pro6000", (), ("r2scan", "b3lyp"), False),
+    # PREREG-8 Amendment 1: six wB97M-V cells x eight arms is 2-3x the work cap; A2 keeps the two
+    # smallest PREREG-4 molecules, the remaining four are not measured.
+    ("A2", "attrib", "pro6000", ("paracetamol", "propranolol"), ("wb97m-v",), False),
+    ("G1", "geoopt", "pro6000", (), (), False),
 )

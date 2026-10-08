@@ -252,6 +252,7 @@ PREREG3_PATH = os.path.join(DOCS, "PREREG-rfcbench-3-large-basis.md")
 PREREG5_PATH = os.path.join(DOCS, "PREREG-rfcbench-5-mig.md")
 PREREG6_PATH = os.path.join(DOCS, "PREREG-rfcbench-6-mig-fit.md")
 PREREG7_PATH = os.path.join(DOCS, "PREREG-rfcbench-7-coldstart-stages-concurrency.md")
+PREREG8_PATH = os.path.join(DOCS, "PREREG-rfcbench-8-geometry-safety.md")
 
 
 def amendment_text(path) -> str:
@@ -302,6 +303,29 @@ def prereg7_gate():
         raise SystemExit("::error::this mode is refused: PREREG-rfcbench-7 already has a RESULT")
 
 
+def prereg8_gate():
+    """The PREREG-rfcbench-8 modes (attrib, geoopt) run only while that protocol is committed with no
+    RESULT yet."""
+    try:
+        text = open(PREREG8_PATH).read()
+    except OSError:
+        raise SystemExit("::error::this mode is refused: PREREG-rfcbench-8 is not committed")
+    m = re.search(r"^## RESULT[ \t]*$", text, flags=re.M)
+    if not m:
+        raise SystemExit("::error::this mode is refused: PREREG-rfcbench-8 has no RESULT heading")
+    if text[m.end():].strip():
+        raise SystemExit("::error::this mode is refused: PREREG-rfcbench-8 already has a RESULT")
+
+
+def required_tree_gate(mode: str, sha: str):
+    """A mode whose policy fields exist on one validated tree only (S.MODE_REQUIRED_TREE). The free
+    runner cannot read trees, so it requires that exact commit; the pod then checks the tree."""
+    need = S.MODE_REQUIRED_TREE.get(mode)
+    if need is not None and sha != need:
+        raise SystemExit(f"::error::mode={mode} needs RFCBENCH_FORK_SHA={need} (its policy fields "
+                         f"exist only on that tree), not {sha}")
+
+
 def migfit_gate():
     """mode=migfit runs only while PREREG-rfcbench-6 is committed with no RESULT yet written, and its
     pre-registered text (above RESULT) names both cascade ids in backticks and every geometry SHA256
@@ -339,7 +363,13 @@ def resolve_cfg() -> dict:
         migfit_gate()
     if mode in S.EXTRA_MODES:
         prereg7_gate()
+    if mode in S.PREREG8_MODES:
+        prereg8_gate()
+        if _env("RFCBENCH_REPEATS"):
+            raise SystemExit(f"::error::RFCBENCH_REPEATS must be blank in mode={mode}: it runs "
+                             f"no warm pairs (PREREG-rfcbench-8)")
     repo, sha = resolve_fork()
+    required_tree_gate(mode, sha)
     adm = S.admissible(mode)
     mols = _list("RFCBENCH_MOLS", mode, adm["mols"])
     xcs = _list("RFCBENCH_XCS", mode, adm["xcs"])

@@ -7,8 +7,12 @@ already installed, with cuTENSOR's lib dir on LD_LIBRARY_PATH. Steps, each fail-
   1. Card gate: `nvidia-smi` shows the requested class's single model and no MIG device; for
      `pro6000mig` exactly one MIG device under an RTX PRO 6000 (and, in step 6, a CUDA total memory
      of 20-28 GB). A landing on anything else means no row: the pod stops here.
-  2. Fetch the fork at RFCBENCH_FORK_SHA, the v1.8.1 tag and VALIDATED_FORK_SHA; each must resolve.
-  3. Validated tree: `git diff --quiet VALIDATED_FORK_SHA FORK_SHA -- gpu4pyscf/`.
+  2. Fetch the fork at RFCBENCH_FORK_SHA, the v1.8.1 tag and every VALIDATED_FORK_SHAS entry; each
+     must resolve.
+  3. Validated tree: `git diff --quiet <validated> FORK_SHA -- gpu4pyscf/` against each validated
+     commit in order; the first that is identical is recorded (`validated_match`). None identical, or
+     a git error, refuses. A mode in MODE_REQUIRED_TREE (PREREG-8 attrib / geoopt) refuses any
+     match but its own commit.
   4. Every file the branch changes under gpu4pyscf/ (tests excluded) is byte-identical in the
      installed wheel to its v1.8.1 copy (modified) or absent (added); then the overlay.
      (Copied from g4pport_pod.py steps 1-2.)
@@ -159,38 +163,70 @@ def fetch(cfg):
     git("init", "-q")
     git("remote", "add", "origin", f"https://github.com/{cfg['fork']}")
     rcs = []
-    for ref in (cfg["sha"], S.VALIDATED_FORK_SHA):
+    for ref in (cfg["sha"],) + tuple(S.VALIDATED_FORK_SHAS):
         rcs.append(git("fetch", "-q", "--depth", "1", "origin", ref)[0])
     rcs.append(git("fetch", "-q", "--depth", "1", "origin",
                    f"refs/tags/{S.BASE_TAG}:refs/tags/{S.BASE_TAG}")[0])
     rcs.append(git("checkout", "-q", cfg["sha"])[0])
     head = git("rev-parse", "HEAD")[1].strip()
     base = git("rev-parse", f"{S.BASE_TAG}^{{commit}}")[1].strip()
-    val = git("rev-parse", f"{S.VALIDATED_FORK_SHA}^{{commit}}")[1].strip()
-    rec["git"] = {"head": head, "base": base, "validated": val, "rc": rcs}
+    vals = [git("rev-parse", f"{v}^{{commit}}")[1].strip() for v in S.VALIDATED_FORK_SHAS]
+    rec["git"] = {"head": head, "base": base, "validated": vals, "rc": rcs}
     ok = True
-    for got, want, what in ((head, cfg["sha"], "fork HEAD"), (base, S.BASE_SHA, S.BASE_TAG),
-                            (val, S.VALIDATED_FORK_SHA, "VALIDATED_FORK_SHA")):
+    checks = [(head, cfg["sha"], "fork HEAD"), (base, S.BASE_SHA, S.BASE_TAG)]
+    checks += [(got, want, f"validated {want[:12]}")
+               for got, want in zip(vals, S.VALIDATED_FORK_SHAS)]
+    for got, want, what in checks:
         if got != want:
             problem(f"fetch: {what} resolves to {got[:12]!r}, not {want[:12]}")
             ok = False
     return ok
 
 
-def validated_tree_problems(rc, out=""):
-    """`git diff --quiet VALIDATED FORK -- gpu4pyscf/`: rc 0 = identical, anything else refuses."""
+def validated_tree_problems(rc, out="", validated=None):
+    """One `git diff --quiet VALIDATED FORK -- gpu4pyscf/`: rc 0 = identical, anything else refuses."""
+    validated = validated or S.VALIDATED_FORK_SHA
     if rc == 0:
         return []
     if rc == 1:
-        return [f"validated tree: the fork's gpu4pyscf/ differs from VALIDATED_FORK_SHA "
-                f"{S.VALIDATED_FORK_SHA[:12]}; only a validated tree may be measured"]
-    return [f"validated tree: git diff failed rc={rc} ({out.strip()[-200:]})"]
+        return [f"validated tree: the fork's gpu4pyscf/ differs from validated "
+                f"{validated[:12]}; only a validated tree may be measured"]
+    return [f"validated tree: git diff against {validated[:12]} failed rc={rc} "
+            f"({out.strip()[-200:]})"]
+
+
+def match_validated(mode, results):
+    """`(matched, problems)` from `[(validated_sha, rc, out), ...]` in VALIDATED_FORK_SHAS order.
+    Pure. `matched` is the first validated commit whose gpu4pyscf/ tree the fork's equals; a git error
+    on ANY comparison, no match at all, or (for a MODE_REQUIRED_TREE mode) a match that is not the
+    mode's own commit, is a problem. Fail closed: an empty `results` matches nothing."""
+    matched, probs = None, []
+    for sha, rc, out in results:
+        if rc == 0:
+            matched = matched or sha
+        elif rc != 1:
+            probs += validated_tree_problems(rc, out, sha)
+    if matched is None:
+        probs.append(f"validated tree: the fork's gpu4pyscf/ equals none of the validated trees "
+                     f"{[r[0][:12] for r in results]}; only a validated tree may be measured")
+    need = S.MODE_REQUIRED_TREE.get(mode)
+    if need is not None and matched != need:
+        probs.append(f"validated tree: mode {mode} needs the tree of {need[:12]} (its policy fields "
+                     f"exist only there); the fork's tree matched "
+                     f"{matched[:12] if matched else None}")
+    return matched, probs
 
 
 def validated_tree(cfg):
-    rc, out = git("diff", "--quiet", S.VALIDATED_FORK_SHA, cfg["sha"], "--", "gpu4pyscf/")
-    rec["validated_tree_rc"] = rc
-    probs = validated_tree_problems(rc, out)
+    results = []
+    for v in S.VALIDATED_FORK_SHAS:
+        rc, out = git("diff", "--quiet", v, cfg["sha"], "--", "gpu4pyscf/")
+        results.append((v, rc, out))
+    matched, probs = match_validated(cfg.get("mode"), results)
+    rec["validated_tree_rc"] = {v[:12]: rc for v, rc, _ in results}
+    rec["validated_match"] = matched
+    emit(f"--- validated tree: matched {matched[:12] if matched else None} "
+         f"(rc {rec['validated_tree_rc']})")
     for p in probs:
         problem(p)
     return not probs
@@ -345,6 +381,10 @@ def probe_main():
     try:
         from gpu4pyscf.dft.mixed_precision import MixedPrecision
         out["policy_reprs"] = C.policy_repr_table(MixedPrecision)
+        try:                                   # PREREG-8 variants: the 09271907 tree only
+            out["policy_reprs"].update(C.policy_repr_table(MixedPrecision, variants=True))
+        except Exception as e:
+            out["policy_variants_error"] = f"{type(e).__name__}: {e}"[:200]
     except Exception as e:
         out["policy_reprs"] = f"unavailable: {type(e).__name__}: {e}"[:200]
     try:
@@ -363,18 +403,22 @@ def probe_main():
     return 0
 
 
-def probe_problems(gpu, res):
-    """Pure verdict on the probe's JSON."""
+def probe_problems(gpu, res, mode=None):
+    """Pure verdict on the probe's JSON. The campaign reprs are always required; the PREREG-8 variant
+    reprs too in a PREREG8_MODES mode (no other key is admitted)."""
     probs = [f"cutensor: {p}" for p in C.cutensor_problems(res.get("contract_engine") or {})]
     if res.get("rdkit_imported") is not False:
         probs.append(f"geometry readers: rdkit imported or reader failed "
                      f"({res.get('rdkit_imported')!r})")
     probs += mig_memory_problems(gpu, (res.get("cuda_mem") or {}).get("total"))
     reprs = res.get("policy_reprs")
-    if not (isinstance(reprs, dict) and sorted(reprs) == sorted(f"{a}|{x}" for a in ("mixed", "cache")
-                                                                for x in S.XCS)
+    base = {f"{a}|{x}" for a in ("mixed", "cache") for x in S.XCS}
+    variants = {f"{v}|{x}" for v in C.POLICY_VARIANTS for x in S.XCS}
+    need = base | (variants if mode in S.PREREG8_MODES else set())
+    if not (isinstance(reprs, dict) and need <= set(reprs) <= base | variants
             and all(isinstance(v, str) and v for v in reprs.values())):
-        probs.append(f"policy: no expected MixedPrecision reprs from the real class ({reprs!r})"[:300])
+        probs.append(f"policy: no expected MixedPrecision reprs from the real class ({reprs!r}; "
+                     f"{res.get('policy_variants_error')})"[:300])
     return probs
 
 
@@ -396,7 +440,7 @@ def probe_step(cfg):
     rec["probe"] = res
     emit(f"--- probe: engine={(res.get('contract_engine') or {}).get('engine')} "
          f"cuda_mem={res.get('cuda_mem')} rdkit_imported={res.get('rdkit_imported')}")
-    for p in probe_problems(cfg["gpu"], res):
+    for p in probe_problems(cfg["gpu"], res, cfg.get("mode")):
         problem(p)
 
 
@@ -521,7 +565,8 @@ def measure(cfg, bad_geom):
         problem(f"coverage: the requested cell list repeats a cell ({keys})")
     runs, ends, groups_rec = {}, {}, []
     for g in S.groups(cells):
-        gkey = f"{g['kind']}/{g['xc']}"
+        gkey = f"{g['kind']}/{g['xc']}" + (f"/{g['cells'][0]['mol']}" if g["kind"] == "geoopt"
+                                           else "")
         todo = [c for c in g["cells"] if c["mol"] not in bad_geom]
         for c in g["cells"]:
             if c["mol"] in bad_geom:

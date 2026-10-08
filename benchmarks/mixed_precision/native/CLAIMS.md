@@ -193,7 +193,7 @@ arithmetic's gain, with the cache's own gain removed.
   1.633) and is not claimed.
 - The L40S row rests on a single pod per cell.
 
-## C4. Accuracy: mixed converges to stock's own iterate; the precision imprint is 4e-9 to 2.7e-7 Ha/Bohr `[N4, N7, N9]`
+## C4. Accuracy: mixed converges to stock's own iterate; the precision imprint is 4e-9 to 2.7e-7 Ha/Bohr `[N4, N7, N9, N10]`
 
 **Setup.** Each downstream cell ran four arms:
 - R, a tight stock reference (`conv_tol 1e-11`, `conv_tol_grad 3e-6`);
@@ -244,9 +244,66 @@ M with R. The S arm was recorded in every sentinel but never read (see the ledge
     C0).
   - ρ compared two independently oriented tolerance residuals (cosine of S′−R against S−R ranges
     from −0.79 to +0.88). It says nothing about precision.
-- **Not covered.** The mode does not touch gradients or Hessians, which run stock. No geometry
-  optimisation was run end to end. Warm-started SCFs, as in an optimiser's later steps, were not
-  measured (see the open questions in the ledger).
+- **At a tighter `conv_tol_grad` (3e-6), mixed tracks stock to near the floor** (PREREG-8 A1/A2,
+  14 cells). Each cell ran eight arms; R′ is stock at `conv_tol` 1e-12 and `conv_tol_grad` 1e-6.
+
+  | Ha/Bohr | r2SCAN (6) | B3LYP (6) | wB97M-V (2) |
+  |---|---|---|---|
+  | stock vs stock, repeated in one process | ≤ 1.8e-12 | 5.4e-9 – 2.9e-8 | 1.3e-8 – 2.0e-8 |
+  | stock vs R′, default `conv_tol_grad` | 6.7e-7 – 1.9e-6 | 5.1e-7 – 3.4e-6 | 1.3e-6 – 3.2e-6 |
+  | stock vs R′, `conv_tol_grad` 3e-6 | 8.3e-8 – 3.2e-7 | 1.3e-7 – 2.6e-7 | 7.4e-7 – 7.5e-7 |
+  | mixed vs R′, `conv_tol_grad` 3e-6 | 8.2e-8 – 3.2e-7 | 1.7e-7 – 2.8e-7 | 7.5e-7 |
+  | **mixed vs stock, `conv_tol_grad` 3e-6** | **1.5e-9 – 2.3e-8** | **6.8e-9 – 2.2e-7** | **1.1e-8 – 2.1e-8** |
+
+  - **Tightening cuts the residual** by 1.8–22× per cell for stock and 1.8–10× for mixed, to the
+    same level for both.
+  - **It costs both arms the same 1–3 cycles**: the mixed and stock cycle counts are identical in
+    every cell.
+  - **The single-run stock/mixed wall ratio holds**: 1.71 → 1.65 (r2SCAN), 1.94 → 1.85 (B3LYP).
+    These are not paired repeats.
+  - **Stock's own floor.** Stock B3LYP and wB97M-V do not repeat bit-for-bit (≤ 3e-8); stock r2SCAN
+    does (≤ 1.8e-12). So the wB97M-V imprint is not resolvable from stock's own scatter.
+  - **Dipoles**, mixed vs stock at the tight tolerance: ≤ 1.4e-6 D (r2SCAN), ≤ 8.7e-6 D (B3LYP),
+    ≤ 4.5e-12 D (wB97M-V).
+  - **Recommendation for gradients and properties:** set `conv_tol_grad` ≈ 3e-6. The default
+    √`conv_tol` leaves a 1e-6-scale residual for stock and mixed alike.
+- **Restarting DIIS at the FP64 switch does not help.** It moves the stopping iterate, which lands
+  7.4e-7 – 3.8e-6 from stock. The fork option `diis_reset_at_switch` stays off and is not proposed.
+- **Not covered.** The mode does not touch gradients or Hessians, which run stock, in FP64.
+
+## C6. Geometry optimisation: the mode follows stock's trajectory `[N10]`
+
+**Setup** (PREREG-8 G1, one pod):
+- paracetamol r2SCAN, paracetamol B3LYP and celecoxib r2SCAN;
+- geomeTRIC through the gradient scanner, at its default convergence set;
+- campaign SCF settings, stock gradients;
+- arms: mixed, mixed with a warm-start rule, and stock.
+
+| cell | steps (mixed / stock) | endpoint RMSD vs stock (Å) | warm-step SCF wall, stock/mixed | whole optimisation, stock/mixed |
+|---|---|---|---|---|
+| paracetamol r2SCAN | 23 / 23 | 9.9e-6 | 1.41 | 1.28 |
+| paracetamol B3LYP | 26 / 26 | 1.5e-6 | 1.42 | 1.19 |
+| celecoxib r2SCAN | 16 / 16 | 4.0e-7 | 1.44 | 1.30 |
+
+- **The same trajectory.** SCF cycles are equal on every step, except the last B3LYP step (mixed 4,
+  stock 5).
+- **Every mixed endpoint passes a stock certificate:** a fresh stock SCF and gradient give grms
+  ≤ 7.2e-5 and gmax ≤ 2.3e-4 Ha/Bohr, and |ΔE| vs stock's final energy ≤ 3.2e-9 Ha.
+- **The whole-optimisation gain is lower than the SCF gain** because the gradient runs stock. The
+  gradient is 26 % of stock's optimisation time for r2SCAN and 50 % for B3LYP.
+- **No warm-start penalty.**
+  - The predicted cost of starting each SCF in FP32 from the previous geometry's density did not
+    appear (P-F falsified). Warm steps take 4–11 cycles in both arms.
+  - The initial orbital-gradient norm on warm steps is 0.014–43. The previous geometry's orbitals
+    are not a near-converged start, so the fork's opt-in warm-start rule (τ = 1e-2) never
+    triggered. It stays off and is not proposed.
+- **Scope.**
+  - Three optimisations on one card, at the default convergence set, with `conv_tol_grad` at the
+    library default.
+  - Wall ratios come from one run each.
+  - In paracetamol r2SCAN, the plain-mixed arm ran first and paid the cold driver JIT on its first
+    SCF, so its whole-optimisation total is not a speed reading. The table quotes the
+    warm-start-rule arm, whose steps were identical.
 
 ## Deployment notes, not claims: MIG and a concurrent whole card `[N5, N6, N7, N8]`
 
@@ -368,8 +425,8 @@ is a fresh process with the caches as shown. Cold extra = cold wall − warm wal
     and 87 s before the dispatches they govern, on a results branch; the dispatched code does not
     contain them. PREREG-7's final text, by contrast, is in the commit every PREREG-7 pod ran
     (`d05888b8`), 7.5 min before the first dispatch.
-  - **The exact harness bytes.** `provenance/harness/` is the harness at `d05888b8`, the commit
-    the PREREG-7 pods ran. Every earlier pod ran at the earlier commit listed in `pods.csv`.
+  - **The exact harness bytes.** `provenance/harness/` is the harness at `5013b101`, the commit
+    the PREREG-8 pods ran. Every earlier pod ran at the earlier commit listed in `pods.csv`.
 - **Dates.** A few status dates and one RESULT date in `prereg/` are a day late. See the ledger.
 - **`reproduce_native.py`** transcribes the measurement path and has not been run on a GPU in this
   form.
@@ -385,6 +442,8 @@ is a fresh process with the caches as shown. Cold extra = cold wall − warm wal
   - the RTX 5090;
   - MIG profiles other than 1g.24gb;
   - four MIG instances running concurrently on one card;
+  - geometry optimisations beyond the three in C6, tight geomeTRIC criteria, and optimisations at
+    `conv_tol_grad` 3e-6;
   - wB97M-V on a MIG instance above 259 Da.
 - **Not transferable:** timings on one card model say nothing about another. The PRO 6000
   Workstation and Server Editions are treated as different models (five models in all: PRO 6000 WS,
@@ -410,6 +469,14 @@ is a fresh process with the caches as shown. Cold extra = cold wall − warm wal
   B3LYP (above); stock paracetamol B3LYP and wB97M-V (vs the per-molecule table, which PREREG-5's
   RESULT decided to apply to every functional); M0 B3LYP against C0.
 - PREREG-6: B3LYP sildenafil mixed MIG gain (above).
+- PREREG-8:
+  - P-B, residual against R′ ≤ 3e-7 at `conv_tol_grad` 3e-6: missed in 3 of 14 cells on both arms
+    (paracetamol r2SCAN 3.2e-7; wB97M-V 7.5e-7);
+  - mixed vs stock ≤ 1e-7: missed in omeprazole B3LYP (2.2e-7);
+  - P-D, the DIIS restart removes the B3LYP imprint: wrong in the other direction (10–100× worse);
+  - P-F, the warm-start penalty: falsified;
+  - P-G, warm-step wall ratios (predicted 0.9–1.3): measured 1.41–1.44, above the band. MW's band
+    was not testable, because the rule never triggered.
 - PREREG-7:
   - ST1 (c): the cache arm's XC is not faster than stock's at sildenafil B3LYP (10.324 s vs
     10.319 s);
@@ -468,5 +535,9 @@ listed numbers are checked by `verify_native.py`:
   XL1–XL3b all ran on one card. None of this was controlled. Only the first case was disclosed when
   the package was first updated for PREREG-7; the independent review found the rest.
 - **PREREG-0 §6's two-repeats rule was again applied to two DEGRADED pods**, here L12r and L12r2.
+- **PREREG-8 A1's first dispatch** (run `37728120899`) produced no sentinel. It was re-dispatched
+  once, unchanged, on the pre-registered reserve.
+- **PREREG-8 A2 was reduced, by Amendment 1 before dispatch, to two wB97M-V cells.** Six would not
+  fit one pod. The other four are not measured.
 - **The ST2 re-run was approved on 2026-10-07, after CC1 had been dispatched.** That changed the
   dispatch order, CS1 → L12r → L12r2 → X3r → ST1 → ST2 → CC1 → ST2r, but no protocol text.

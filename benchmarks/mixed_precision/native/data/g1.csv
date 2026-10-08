@@ -1,0 +1,10 @@
+run_id,key,pair,run,arm,wall_s,e,cycles,converged,ngrids,naux,nao,policy,ao_cache_tier,xc,k,vv10,fp64_tail,ao_cache_bytes64,ao_cache_bytes32,cderi_types,cderi_bytes,error
+37738477503-1-5013b101,geoopt/paracetamol/r2scan/mtzvpp,,M0,,159.43,,,True,385280,993,269,,,,,,,,,,0,
+37738477503-1-5013b101,geoopt/paracetamol/r2scan/mtzvpp,,MW,,51.89,,,True,385280,993,269,,,,,,,,,,0,
+37738477503-1-5013b101,geoopt/paracetamol/r2scan/mtzvpp,,S,,66.03,,,True,385280,993,269,,,,,,,,,,0,
+37738477503-1-5013b101,geoopt/paracetamol/b3lyp/mtzvpp,,M0,,57.5,,,True,385280,993,269,,,,,,,,,cupy.ndarray,256368768,
+37738477503-1-5013b101,geoopt/paracetamol/b3lyp/mtzvpp,,MW,,56.33,,,True,385280,993,269,,,,,,,,,cupy.ndarray,256368768,
+37738477503-1-5013b101,geoopt/paracetamol/b3lyp/mtzvpp,,S,,66.78,,,True,385280,993,269,,,,,,,,,cupy.ndarray,256368768,
+37738477503-1-5013b101,geoopt/celecoxib/r2scan/mtzvpp,,M0,,154.24,,,True,812544,2271,612,,,,,,,,,,0,
+37738477503-1-5013b101,geoopt/celecoxib/r2scan/mtzvpp,,MW,,150.52,,,True,812544,2271,612,,,,,,,,,,0,
+37738477503-1-5013b101,geoopt/celecoxib/r2scan/mtzvpp,,S,,195.24,,,True,812544,2271,612,,,,,,,,,,0,

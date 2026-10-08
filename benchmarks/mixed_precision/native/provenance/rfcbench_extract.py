@@ -205,10 +205,15 @@ def extract(text, run_id, unquotable=False):
     repeats = repeats_of(header, pod)
     verdicts = {v["key"]: v for v in pod.get("cells") or []}
     requested = pod.get("cells_requested") or []
-    cells, missing, fit_table, downstream, bridge = [], [], [], [], []
+    cells, missing, fit_table, downstream, bridge, prereg8 = [], [], [], [], [], []
     for key in requested:
         v = verdicts.get(key, {})
         kind = key.split("/", 1)[0]
+        if kind in ("attrib", "geoopt"):       # PREREG-rfcbench-8: the pod's verdict and readings only
+            prereg8.append({"key": key, "status": v.get("status"), "fit": v.get("fit"),
+                            "readings": v.get("readings"),
+                            "streamed_runs": len(runs.get(key, []))})
+            continue
         if kind == "downstream":
             downstream.append({"key": key, "status": v.get("status"),
                                "readings": v.get("readings")})
@@ -242,7 +247,7 @@ def extract(text, run_id, unquotable=False):
     on_pro = header.get("GPU_CLASS") == "pro6000"          # the band is a PRO 6000 band only
     out = {"header": header, "status": header.get("STATUS"), "quotable": not why,
            "unquotable_why": why, "repeats": repeats, "cells": cells, "bridge": bridge,
-           "downstream": downstream, "missing": missing, "fit_table": fit_table,
+           "downstream": downstream, "prereg8": prereg8, "missing": missing, "fit_table": fit_table,
            "aggregates": agg, "noisy": n_noisy,
            "degraded": bool(cells) and n_noisy / len(cells) > DEGRADED_NOISY_FRACTION,
            "canary_s": canary,
@@ -263,7 +268,7 @@ def extract(text, run_id, unquotable=False):
         for a in agg.values():
             a["label"] = "UNQUOTABLE"
             a["reading"] = f"UNQUOTABLE {a['reading']}"
-        for d in downstream:
+        for d in downstream + prereg8:
             d["label"] = "UNQUOTABLE"
     return out
 

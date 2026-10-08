@@ -1241,6 +1241,190 @@ check("N9", "cosine of (g_Sp - g_R, g_S - g_R): highest over 18 cells",
       lambda: max(_cos(ARMS[k], "Sp", "S") for k in DS18), "0.88")
 
 
+# --------------------------------------------------------------------------------------------- #
+# N10. PREREG-8: what sets the residual (A1, A2: eight arms per cell) and geometry optimisations
+# (G1). Read from the raw sentinel vectors and per-step records, never from the pod's readings.
+# --------------------------------------------------------------------------------------------- #
+def _p8_cells(pods, kind):
+    import json
+    out = {}
+    for p in pods:
+        for ln in _sentinel(p).decode().splitlines():
+            if ln.startswith("RFCBENCH_CELL ") and f'"{kind}/' in ln:
+                d = json.loads(ln.split(" ", 1)[1])
+                out.setdefault(d["key"], {})[d["run"]] = d["runs"][-1]
+    return out
+
+
+try:
+    ATT = _p8_cells(("a1", "a2"), "attrib")
+    GEO = _p8_cells(("g1",), "geoopt")
+except Exception as _e:
+    ATT, GEO = {}, {}
+    results.append(("N10", "PREREG-8 cells parsed from the sentinels", f"ERROR {type(_e).__name__}: {_e}", "True", False))
+_att = lambda xc: [c for k, c in ATT.items() if f"/{xc}/" in k]
+check_true("N10", "A1 + A2: 14 attrib cells (12 r2SCAN/B3LYP, 2 wB97M-V), each with the eight arms",
+           lambda: len(ATT) == 14 and len(_att("wb97m-v")) == 2
+           and all(set(c) == {"Rp", "R", "S", "S2", "St", "M", "Mt", "Md"} for c in ATT.values()))
+P8_RANGES = {  # (a, b): {xc: (lowest, highest)} as printed in PREREG-8's RESULT table
+    ("S2", "S"): {"r2scan": ("5.1e-13", "1.8e-12"), "b3lyp": ("5.4e-9", "2.9e-8"), "wb97m-v": ("1.3e-8", "2.0e-8")},
+    ("S", "Rp"): {"r2scan": ("6.7e-7", "1.9e-6"), "b3lyp": ("5.1e-7", "3.4e-6"), "wb97m-v": ("1.3e-6", "3.2e-6")},
+    ("M", "Rp"): {"r2scan": ("6.6e-7", "2.0e-6"), "b3lyp": ("6.3e-7", "1.8e-6"), "wb97m-v": ("1.3e-6", "3.2e-6")},
+    ("St", "Rp"): {"r2scan": ("8.3e-8", "3.2e-7"), "b3lyp": ("1.3e-7", "2.6e-7"), "wb97m-v": ("7.4e-7", "7.5e-7")},
+    ("Mt", "Rp"): {"r2scan": ("8.2e-8", "3.2e-7"), "b3lyp": ("1.7e-7", "2.8e-7"), "wb97m-v": ("7.5e-7", "7.5e-7")},
+    ("Mt", "St"): {"r2scan": ("1.5e-9", "2.3e-8"), "b3lyp": ("6.8e-9", "2.2e-7"), "wb97m-v": ("1.1e-8", "2.1e-8")},
+    ("M", "S"): {"r2scan": ("4.0e-9", "5.2e-8"), "b3lyp": ("2.3e-8", "4.5e-6"), "wb97m-v": ("1.6e-8", "1.6e-8")},
+    ("Md", "S"): {"r2scan": ("1.1e-6", "3.2e-6"), "b3lyp": ("7.4e-7", "3.8e-6"), "wb97m-v": ("1.7e-6", "2.2e-6")},
+}
+for (a, b), byxc in P8_RANGES.items():
+    for xc, (lo, hi) in byxc.items():
+        check("N10", f"{xc}: lowest max |g_{a} - g_{b}|", lambda a=a, b=b, xc=xc: min(_vd(c, a, b) for c in _att(xc)), lo)
+        check("N10", f"{xc}: highest max |g_{a} - g_{b}|", lambda a=a, b=b, xc=xc: max(_vd(c, a, b) for c in _att(xc)), hi)
+for xc, (lo, hi) in {"r2scan": (2, 3), "b3lyp": (1, 3), "wb97m-v": (1, 2)}.items():
+    check_true("N10", f"{xc}: St takes {lo}-{hi} more cycles than S; Mt equals St in every cell",
+               lambda xc=xc, lo=lo, hi=hi: (min(c["St"]["cycles"] - c["S"]["cycles"] for c in _att(xc)), max(
+                   c["St"]["cycles"] - c["S"]["cycles"] for c in _att(xc))) == (lo, hi)
+               and all(c["Mt"]["cycles"] == c["St"]["cycles"] for c in _att(xc)))
+for xc, v0, v1 in (("r2scan", "1.71", "1.65"), ("b3lyp", "1.94", "1.85"), ("wb97m-v", "2.80", "3.01")):
+    check("N10", f"{xc}: geomean S/M wall (single runs)", lambda xc=xc: geomean(c["S"]["wall_s"] / c["M"]["wall_s"] for c in _att(xc)), v0)
+    check("N10", f"{xc}: geomean St/Mt wall (single runs)", lambda xc=xc: geomean(c["St"]["wall_s"] / c["Mt"]["wall_s"] for c in _att(xc)), v1)
+check_true("N10", "P-B: 3 of 14 cells have max |g_Mt - g_Rp| > 3e-7 (paracetamol r2SCAN, both wB97M-V); none > 1e-6",
+           lambda: sorted(k for k, c in ATT.items() if _vd(c, "Mt", "Rp") > 3e-7) == sorted([
+               "attrib/paracetamol/r2scan/mtzvpp", "attrib/paracetamol/wb97m-v/mtzvpp", "attrib/propranolol/wb97m-v/mtzvpp"])
+           and not any(_vd(c, "Mt", "Rp") > 1e-6 for c in ATT.values()))
+check_true("N10", "P-B: max |g_Mt - g_St| > 1e-7 only in omeprazole B3LYP",
+           lambda: [k for k, c in ATT.items() if _vd(c, "Mt", "St") > 1e-7] == ["attrib/omeprazole/b3lyp/mtzvpp"])
+check("N10", "tightening: lowest per-cell |S-Rp| / |St-Rp|", lambda: min(_vd(c, "S", "Rp") / _vd(c, "St", "Rp") for c in ATT.values()), "1.8")
+check("N10", "tightening: highest per-cell |S-Rp| / |St-Rp|", lambda: max(_vd(c, "S", "Rp") / _vd(c, "St", "Rp") for c in ATT.values()), "22")
+check("N10", "tightening: lowest per-cell |M-Rp| / |Mt-Rp|", lambda: min(_vd(c, "M", "Rp") / _vd(c, "Mt", "Rp") for c in ATT.values()), "1.8")
+check("N10", "tightening: highest per-cell |M-Rp| / |Mt-Rp|", lambda: max(_vd(c, "M", "Rp") / _vd(c, "Mt", "Rp") for c in ATT.values()), "10")
+for xc, v in (("r2scan", "1.4e-6"), ("b3lyp", "8.7e-6"), ("wb97m-v", "4.5e-12")):
+    check("N10", f"{xc}: highest max |mu_Mt - mu_St| (D)", lambda xc=xc: max(_vd(c, "Mt", "St", "dip") for c in _att(xc)), v)
+check("N10", "highest max |mu_St - mu_Rp| over 14 cells (D)", lambda: max(_vd(c, "St", "Rp", "dip") for c in ATT.values()), "1.9e-5")
+check_true("N10", "P-D: B3LYP Md takes one more cycle than M in 4 of 6 cells, never more",
+           lambda: sum(c["Md"]["cycles"] - c["M"]["cycles"] == 1 for c in _att("b3lyp")) == 4
+           and all(0 <= c["Md"]["cycles"] - c["M"]["cycles"] <= 1 for c in _att("b3lyp")))
+check("N10", "P-E: paracetamol r2SCAN max |g_M - g_S| on A1", lambda: _vd(ATT["attrib/paracetamol/r2scan/mtzvpp"], "M", "S"), "9.3e-9")
+check("N10", "P-E: omeprazole B3LYP max |g_M - g_S| on A1", lambda: _vd(ATT["attrib/omeprazole/b3lyp/mtzvpp"], "M", "S"), "4.5e-6")
+
+
+def _horn_rmsd(a, b):
+    """Optimal-rotation RMSD between two N x 3 sets: Horn's quaternion method (stdlib Jacobi on the
+    4 x 4 profile matrix), with the rotation built from the eigenvector and applied, so the RMSD is
+    a direct difference (the closed form ga + gb - 2 lambda cancels catastrophically at 1e-7 A)."""
+    n = len(a)
+    ca = [sum(r[i] for r in a) / n for i in range(3)]
+    cb = [sum(r[i] for r in b) / n for i in range(3)]
+    A = [[r[i] - ca[i] for i in range(3)] for r in a]
+    B = [[r[i] - cb[i] for i in range(3)] for r in b]
+    M = [[sum(x[i] * y[j] for x, y in zip(A, B)) for j in range(3)] for i in range(3)]
+    (sxx, sxy, sxz), (syx, syy, syz), (szx, szy, szz) = M
+    K = [[sxx + syy + szz, syz - szy, szx - sxz, sxy - syx],
+         [syz - szy, sxx - syy - szz, sxy + syx, szx + sxz],
+         [szx - sxz, sxy + syx, -sxx + syy - szz, syz + szy],
+         [sxy - syx, szx + sxz, syz + szy, -sxx - syy + szz]]
+    V = [[1.0 if i == j else 0.0 for j in range(4)] for i in range(4)]
+    for _ in range(100):                      # cyclic Jacobi, eigenvectors accumulated in V
+        if max(abs(K[i][j]) for i in range(4) for j in range(4) if i != j) < 1e-300:
+            break
+        for p in range(3):
+            for q in range(p + 1, 4):
+                if abs(K[p][q]) < 1e-300:
+                    continue
+                th = (K[q][q] - K[p][p]) / (2 * K[p][q])
+                t = (1 if th >= 0 else -1) / (abs(th) + math.sqrt(th * th + 1))
+                c = 1 / math.sqrt(t * t + 1)
+                s_ = t * c
+                for k in range(4):
+                    kp, kq = K[k][p], K[k][q]
+                    K[k][p], K[k][q] = c * kp - s_ * kq, s_ * kp + c * kq
+                for k in range(4):
+                    pk, qk = K[p][k], K[q][k]
+                    K[p][k], K[q][k] = c * pk - s_ * qk, s_ * pk + c * qk
+                for k in range(4):
+                    vp, vq = V[k][p], V[k][q]
+                    V[k][p], V[k][q] = c * vp - s_ * vq, s_ * vp + c * vq
+    m = max(range(4), key=lambda i: K[i][i])
+    q0, q1, q2, q3 = (V[k][m] for k in range(4))
+    R = [[q0*q0 + q1*q1 - q2*q2 - q3*q3, 2*(q1*q2 - q0*q3), 2*(q1*q3 + q0*q2)],
+         [2*(q1*q2 + q0*q3), q0*q0 - q1*q1 + q2*q2 - q3*q3, 2*(q2*q3 - q0*q1)],
+         [2*(q1*q3 - q0*q2), 2*(q2*q3 + q0*q1), q0*q0 - q1*q1 - q2*q2 + q3*q3]]
+    d2 = 0.0
+    for x, y in zip(A, B):
+        rx = [sum(R[i][j] * x[j] for j in range(3)) for i in range(3)]
+        d2 += sum((rx[i] - y[i]) ** 2 for i in range(3))
+    return math.sqrt(d2 / n)
+
+
+def _xyz(run):
+    return [[float(v) for v in r[1:]] for r in run["final"]]
+
+
+check_true("N10", "Horn RMSD self-test: a rotated, translated copy aligns to < 1e-12 A", lambda: _horn_rmsd(
+    [[1.0, 0.0, 0.0], [0.0, 2.0, 0.0], [0.0, 0.0, 3.0], [1.0, 1.0, 1.0]],
+    [[0.0, 1.0 + 5, 0.0], [-2.0, 0.0 + 5, 0.0], [0.0, 0.0 + 5, 3.0], [-1.0, 1.0 + 5, 1.0]]) < 1e-12
+           and _horn_rmsd([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],
+                          [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, -1]]) > 0.1)   # a mirror image does not align
+_G = {"paracetamol/r2scan": "geoopt/paracetamol/r2scan/mtzvpp", "paracetamol/b3lyp": "geoopt/paracetamol/b3lyp/mtzvpp",
+      "celecoxib/r2scan": "geoopt/celecoxib/r2scan/mtzvpp"}
+check_true("N10", "G1: three cells, arms M0, MW and S each; steps 23 / 26 / 16, equal across arms",
+           lambda: len(GEO) == 3 and all(set(GEO[k]) == {"M0", "MW", "S"} for k in _G.values())
+           and [{len(GEO[_G[c]][a]["step"]) for a in ("M0", "MW", "S")} for c in _G] == [{23}, {26}, {16}])
+check_true("N10", "G1: SCF cycles equal on every step for M0, MW and S, but the last B3LYP step (S 5, mixed 4)",
+           lambda: all([x["c"] for x in GEO[k]["M0"]["step"]] == [x["c"] for x in GEO[k]["MW"]["step"]] for k in _G.values())
+           and all([x["c"] for x in GEO[k]["M0"]["step"]] == [x["c"] for x in GEO[k]["S"]["step"]]
+                   for k in (_G["paracetamol/r2scan"], _G["celecoxib/r2scan"]))
+           and [a - b for a, b in zip([x["c"] for x in GEO[_G["paracetamol/b3lyp"]]["M0"]["step"]],
+                                      [x["c"] for x in GEO[_G["paracetamol/b3lyp"]]["S"]["step"]])] == [0] * 25 + [-1])
+check_true("N10", "G1: warm steps take 4-11 SCF cycles; no r2SCAN warm step takes 5 or fewer",
+           lambda: (min(x["c"] for k in _G.values() for a in ("M0", "S") for x in GEO[k][a]["step"][1:]),
+                    max(x["c"] for k in _G.values() for a in ("M0", "S") for x in GEO[k][a]["step"][1:])) == (4, 11)
+           and min(x["c"] for k in (_G["paracetamol/r2scan"], _G["celecoxib/r2scan"]) for x in GEO[k]["S"]["step"][1:]) >= 6)
+check_true("N10", "G1: every step's SCF converged; every mixed SCF ended on an FP64 tail",
+           lambda: all(x["ok"] for k in _G.values() for a in ("M0", "MW", "S") for x in GEO[k][a]["step"])
+           and all(x["tail"] for k in _G.values() for a in ("M0", "MW") for x in GEO[k][a]["step"]))
+_warm = lambda k, a: sum(x["t"] for x in GEO[k][a]["step"][1:])
+_tot = lambda k, a: sum(x["t"] + x["g"] for x in GEO[k][a]["step"])
+for c, v_scf, v_tot, v_g in (("paracetamol/r2scan", "1.41", "1.28", "0.26"), ("paracetamol/b3lyp", "1.42", "1.19", "0.50"),
+                             ("celecoxib/r2scan", "1.44", "1.30", "0.26")):
+    k = _G[c]
+    check("N10", f"G1 {c}: warm-step SCF wall, S / M0", lambda k=k: _warm(k, "S") / _warm(k, "M0"), v_scf)
+    check("N10", f"G1 {c}: whole optimisation (SCF + gradient), S / MW", lambda k=k: _tot(k, "S") / _tot(k, "MW"), v_tot)
+    check("N10", f"G1 {c}: gradient share of stock's optimisation",
+          lambda k=k: sum(x["g"] for x in GEO[k]["S"]["step"]) / _tot(k, "S"), v_g)
+check("N10", "G1: lowest warm-step initial orbital-gradient norm (M0)",
+      lambda: min(x["ws"]["gorb"] for k in _G.values() for x in GEO[k]["M0"]["step"][1:]), "0.014")
+check("N10", "G1: highest warm-step initial orbital-gradient norm (M0)",
+      lambda: max(x["ws"]["gorb"] for k in _G.values() for x in GEO[k]["M0"]["step"][1:]), "43")
+check_true("N10", "G1: MW's warm-start rule (tau 1e-2) triggered on no step; every warm step had a supplied density",
+           lambda: not any(x["ws"]["fp64"] for k in _G.values() for x in GEO[k]["MW"]["step"])
+           and all(x["ws"]["supplied"] and x["ws"]["tol"] == 1e-2 for k in _G.values() for x in GEO[k]["MW"]["step"][1:]))
+for c, (m0, mw) in (("paracetamol/r2scan", ("9.9e-6", "9.4e-6")), ("paracetamol/b3lyp", ("1.5e-6", "3.5e-6")),
+                    ("celecoxib/r2scan", ("4.0e-7", "4.1e-7"))):
+    k = _G[c]
+    for arm, v in (("M0", m0), ("MW", mw)):
+        check("N10", f"G1 {c}: endpoint RMSD {arm} vs S, aligned (A)",
+              lambda k=k, arm=arm: _horn_rmsd(_xyz(GEO[k][arm]), _xyz(GEO[k]["S"])), v)
+
+
+def _gnorm(g):
+    n = [math.sqrt(sum(v * v for v in r)) for r in g]
+    return math.sqrt(sum(x * x for x in n) / len(n)), max(n)
+
+
+for c, (grms, gmax) in (("paracetamol/r2scan", ("7.2e-5", "2.1e-4")), ("paracetamol/b3lyp", ("5.8e-6", "1.8e-5")),
+                        ("celecoxib/r2scan", ("6.8e-5", "2.3e-4"))):
+    k = _G[c]
+    check("N10", f"G1 {c}: M0 endpoint stock grms (Ha/Bohr)", lambda k=k: _gnorm(GEO[k]["M0"]["endpoint"]["grad"])[0], grms)
+    check("N10", f"G1 {c}: M0 endpoint stock gmax (Ha/Bohr)", lambda k=k: _gnorm(GEO[k]["M0"]["endpoint"]["grad"])[1], gmax)
+check_true("N10", "G1: every mixed endpoint passes the stock certificate (grms <= 3e-4, gmax <= 4.5e-4, |dE| vs S <= 1e-6)",
+           lambda: all(_gnorm(GEO[k][a]["endpoint"]["grad"])[0] <= 3e-4 and _gnorm(GEO[k][a]["endpoint"]["grad"])[1] <= 4.5e-4
+                       and abs(GEO[k][a]["endpoint"]["e"] - GEO[k]["S"]["e_final"]) <= 1e-6
+                       for k in _G.values() for a in ("M0", "MW")))
+check("N10", "G1: largest |E_stock(mixed endpoint) - E_S(final)| (Ha)",
+      lambda: max(abs(GEO[k][a]["endpoint"]["e"] - GEO[k]["S"]["e_final"]) for k in _G.values() for a in ("M0", "MW")), "3.2e-9")
+
+
 def data_integrity():
     """Every file in data/ must be listed in data/SHA256SUMS with a matching hash, and every listed
     file must exist: a missing, extra or edited data file is a FAIL before any number is read."""
@@ -1264,7 +1448,7 @@ def data_integrity():
     return probs
 
 
-EXPECTED_CHECKS = 734   # pinned: a check that silently disappears (or appears) is a FAIL
+EXPECTED_CHECKS = 845   # pinned: a check that silently disappears (or appears) is a FAIL
 
 
 def main():

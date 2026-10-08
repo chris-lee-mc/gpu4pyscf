@@ -66,6 +66,24 @@ def policy_kwargs(arm: str, xc: str):
             "wb97m-v": {"vv10": True, "ao_cache_fp64": True}}[xc]
 
 
+# PREREG-rfcbench-8: the campaign mixed policy plus ONE opt-in field of the 09271907 tree.
+POLICY_VARIANTS = ("mixed_dreset", "mixed_ws0", "mixed_wsw")
+
+
+def variant_kwargs(variant: str, xc: str):
+    """The MixedPrecision kwargs of a PREREG-8 policy variant: `mixed` is the campaign policy
+    (`policy_kwargs("mixed", xc)`); `mixed_dreset` adds diis_reset_at_switch=True (Md);
+    `mixed_ws0` adds warm_start_gorb=1e-300 (M0, record only); `mixed_wsw` adds warm_start_gorb=1e-2
+    (MW). None (stock) stays None."""
+    if variant is None:
+        return None
+    base = policy_kwargs("mixed", xc)
+    extra = {"mixed": {}, "mixed_dreset": {"diis_reset_at_switch": True},
+             "mixed_ws0": {"warm_start_gorb": S.WARM_GORB_RECORD_ONLY},
+             "mixed_wsw": {"warm_start_gorb": S.WARM_GORB_MW}}[variant]
+    return dict(base, **extra)
+
+
 # --------------------------------------------------------------------------------------------- #
 # compact call lists: run-length "fp32*4,fp64*6" (the sentinel must stay small)
 # --------------------------------------------------------------------------------------------- #
@@ -358,10 +376,15 @@ def _status(mode, structural, gate, fit):
     return OK
 
 
-def policy_repr_table(mixed_precision_cls):
+def policy_repr_table(mixed_precision_cls, variants=False):
     """`{"arm|xc": repr(MixedPrecision(**policy_kwargs(arm, xc)))}` for every treated arm, built from
     the REAL class (on the pod, in the probe process). The judge compares every run's recorded
-    `policy` against it, so a run whose record was not produced by the arm's policy cannot pass."""
+    `policy` against it, so a run whose record was not produced by the arm's policy cannot pass.
+    `variants=True` returns the PREREG-8 variants (`mixed_dreset|xc`, ...) instead; on a tree without
+    those fields the class raises, and the caller records that."""
+    if variants:
+        return {f"{v}|{xc}": repr(mixed_precision_cls(**variant_kwargs(v, xc)))
+                for v in POLICY_VARIANTS for xc in S.XCS}
     return {f"{arm}|{xc}": repr(mixed_precision_cls(**policy_kwargs(arm, xc)))
             for arm in ("mixed", "cache") for xc in S.XCS}
 
@@ -548,6 +571,341 @@ def judge_downstream(mode, cell, runs, expect=None):
     return structural, gate, _worst_fit(fits), readings
 
 
+# --------------------------------------------------------------------------------------------- #
+# PREREG-rfcbench-8 A1/A2: eight-arm attribution
+# --------------------------------------------------------------------------------------------- #
+ATTRIB_E_TOL = 1e-8                    # |E_arm - E_R'| (Ha)
+ATTRIB_MIXED = ("M", "Mt", "Md")
+# The pairwise max-abs gradient / dipole deltas the predictions P-A .. P-E read (disclosed only).
+ATTRIB_PAIRS = (("S2", "S"), ("St", "Rp"), ("Mt", "Rp"), ("Mt", "St"), ("Md", "S"), ("M", "S"),
+                ("S", "Rp"))
+
+
+def attrib_settings(arm):
+    """What `settings_problems` requires of an attrib arm (S.ATTRIB_PLAN)."""
+    return dict(S.ATTRIB_PLAN[arm][1])
+
+
+def _vector_problems(tag, x, rows=None, width=None):
+    """A gradient (N x 3) or dipole (3) present, rectangular and finite. Fail closed."""
+    try:
+        if rows is None:
+            ok = (isinstance(x, list) and len(x) == width
+                  and all(_finite_real(v) for v in x))
+        else:
+            ok = (isinstance(x, list) and len(x) >= 1
+                  and all(isinstance(r, list) and len(r) == 3 and all(_finite_real(v) for v in r)
+                          for r in x))
+    except Exception:
+        ok = False
+    return [] if ok else [f"{tag}: {'gradient' if rows else 'dipole'} missing or malformed"]
+
+
+def _finite_real(x):
+    return isinstance(x, numbers.Real) and not isinstance(x, bool) and math.isfinite(x)
+
+
+def judge_attrib(mode, cell, runs, expect=None):
+    """PREREG-8 A1/A2 gates, plus PREREG-0's observation discipline (settings read back per arm, the
+    recorded policy is the arm's own, a stock arm carries no policy, ngrids/naux/nao and a non-atom
+    init_guess shared by every arm, no mixed state alive before the stock gradient) and the treated-run
+    gates of `treated_run_problems` on M, Mt and Md. Returns (structural, gate, fit, readings)."""
+    structural, gate, fits = [], [], []
+    key = S.cell_key(cell)
+    xc = cell["xc"]
+    readings = {"cycles": {}, "wall_s": {}, "grad_wall_s": {}, "dg": {}, "dmu": {}, "de_vs_Rp": {}}
+    order = [r.get("run") for r in runs]
+    if order != list(S.ATTRIB_ARMS):
+        structural.append(f"{key}: runs {order}, expected {list(S.ATTRIB_ARMS)}")
+        return structural, gate, TREATED, readings
+    by = {r["run"]: r for r in runs}
+    for r in runs:
+        tag = f"{key} {r['run']}"
+        if r.get("error"):
+            structural.append(f"{tag}: {r['error']}")
+            continue
+        gate += settings_problems(tag, r, cell, attrib_settings(r["run"]))
+        variant = S.ATTRIB_PLAN[r["run"]][0]
+        gate += observation_problems(tag, r, variant or "stock", xc, expect)
+        if r.get("converged") is not True:
+            gate.append(f"{tag}: not converged ({r.get('converged')!r})")
+        if r.get("state_none") is not True:
+            gate.append(f"{tag}: _mixed_precision_state was not None before the gradient")
+        gate += _vector_problems(tag, r.get("grad"), rows=True)
+        gate += _vector_problems(tag, r.get("dip"), width=3)
+        readings["cycles"][r["run"]] = r.get("cycles")
+        readings["wall_s"][r["run"]] = r.get("wall_s")
+        readings["grad_wall_s"][r["run"]] = r.get("grad_wall_s")
+    if structural:
+        return structural, gate, TREATED, readings
+    gate += consistency_problems(key, runs)
+    try:
+        e_ref = float(by["Rp"]["e"])
+        for arm in S.ATTRIB_ARMS:
+            de = abs(float(by[arm]["e"]) - e_ref)
+            readings["de_vs_Rp"][arm] = de
+            if not de <= ATTRIB_E_TOL:
+                gate.append(f"{key} {arm}: |E - E_R'| {de:.3e} > {ATTRIB_E_TOL:g}")
+    except Exception as e:
+        gate.append(f"{key}: energies unreadable: {type(e).__name__}: {e}"[:300])
+    for arm in ATTRIB_MIXED:
+        tag = f"{key} {arm}"
+        rec = by[arm].get("rec")
+        if not isinstance(rec, dict):
+            gate.append(f"{tag}: no mixed_precision_record")
+            continue
+        try:
+            fit = classify_fit("mixed", xc, rec)
+        except Exception as e:
+            gate.append(f"{tag}: fit unclassifiable: {type(e).__name__}: {e}"[:300])
+            continue
+        fits.append(fit)
+        if fit != TREATED:
+            gate.append(f"{tag}: fit {fit}, not TREATED (PREREG-8 gate)")
+        gate += treated_run_problems(tag, "mixed", xc, rec, fit)
+        fields = rec.get("geo_fields")
+        if not (isinstance(fields, list) and "diis_reset_call" in fields):
+            gate.append(f"{tag}: the record carries no diis_reset_call field ({fields!r}); a reset "
+                        f"(or its absence) must be observed, not inferred")
+            continue
+        reset = rec.get("diis_reset_call")
+        if arm == "Md" and reset is None:
+            gate.append(f"{tag}: diis_reset_at_switch=True but no diis_reset_call recorded")
+        if arm != "Md" and reset is not None:
+            gate.append(f"{tag}: a DIIS reset was recorded ({reset!r}) on a policy without one")
+    for a, b in ATTRIB_PAIRS:
+        try:
+            readings["dg"][f"{a}-{b}"] = _maxabs_diff(by[a]["grad"], by[b]["grad"])
+            readings["dmu"][f"{a}-{b}"] = _maxabs_diff(by[a]["dip"], by[b]["dip"])
+        except Exception:
+            readings["dg"][f"{a}-{b}"] = readings["dmu"][f"{a}-{b}"] = None
+    return structural, gate, _worst_fit(fits), readings
+
+
+# --------------------------------------------------------------------------------------------- #
+# PREREG-rfcbench-8 G1: geometry optimisations through the gradient scanner
+# --------------------------------------------------------------------------------------------- #
+GEO_E_TOL = 1e-6                       # |E_stock(endpoint) - E_S(final)| (Ha)
+GEO_MIXED = ("M0", "MW")
+BOHR_TO_A = 0.52917721092
+
+
+def grad_norms(g):
+    """geomeTRIC's Cartesian convention: RMS and max over atoms of the per-atom norm |g_a|. Pure.
+    Raises on a malformed or non-finite gradient (the caller makes it a problem)."""
+    rows = [[float(v) for v in r] for r in g]
+    if not rows or any(len(r) != 3 for r in rows):
+        raise ValueError("gradient is not N x 3")
+    n = [math.sqrt(sum(v * v for v in r)) for r in rows]
+    if not all(math.isfinite(x) for x in n):
+        raise ValueError("non-finite gradient")
+    return {"grms": math.sqrt(sum(x * x for x in n) / len(n)), "gmax": max(n)}
+
+
+def kabsch_rmsd(a, b):
+    """Kabsch-aligned RMSD between two N x 3 coordinate sets (centroids removed, optimal proper
+    rotation, reflection excluded). numpy, imported lazily (the judge's module level is stdlib)."""
+    import numpy as np
+    p = np.asarray(a, dtype=float)
+    q = np.asarray(b, dtype=float)
+    if p.shape != q.shape or p.ndim != 2 or p.shape[1] != 3 or not p.shape[0]:
+        raise ValueError(f"shape mismatch {p.shape} vs {q.shape}")
+    p = p - p.mean(axis=0)
+    q = q - q.mean(axis=0)
+    u, _s, vt = np.linalg.svd(p.T @ q)
+    d = np.sign(np.linalg.det(vt.T @ u.T)) or 1.0
+    rot = vt.T @ np.diag([1.0, 1.0, d]) @ u.T
+    diff = (rot @ p.T).T - q
+    return float(np.sqrt((diff ** 2).sum(axis=1).mean()))
+
+
+# The warm-start record of fork 09271907 (`hf._mixed_precision_warm_start`) is exactly
+# {'tol': float, 'supplied': bool, 'gorb': float | None, 'fp64': bool}. Disclosure only, never a gate.
+WS_NORM_KEYS = ("gorb",)
+WS_TRIGGER_KEYS = ("fp64",)
+
+
+def warm_start_fields(ws):
+    """(initial orbital-gradient norm, triggered) out of a warm-start record, each None when the
+    record does not carry it in a recognised form."""
+    if not isinstance(ws, dict):
+        return None, None
+    norm = next((float(ws[k]) for k in WS_NORM_KEYS if _finite_real(ws.get(k))), None)
+    trig = next((ws[k] for k in WS_TRIGGER_KEYS if isinstance(ws.get(k), bool)), None)
+    return norm, trig
+
+
+def _steps_problems(tag, run, mixed):
+    """Every SCF of every step converged; a mixed SCF ended on an FP64 tail; there is one SCF record
+    per optimisation step at least (a step whose SCF was never observed is not a converged one)."""
+    probs = []
+    steps, recs = run.get("steps"), run.get("step")
+    if not (_count(steps) and steps >= 1 and isinstance(recs, list) and len(recs) >= steps):
+        return [f"{tag}: {len(recs) if isinstance(recs, list) else recs!r} SCF records for "
+                f"{steps!r} optimisation steps"]
+    for i, st in enumerate(recs):
+        if not isinstance(st, dict):
+            probs.append(f"{tag} step {i}: malformed SCF record")
+            continue
+        if st.get("ok") is not True:
+            probs.append(f"{tag} step {i}: SCF not converged ({st.get('ok')!r})")
+        if mixed and st.get("tail") is not True:
+            probs.append(f"{tag} step {i}: mixed SCF did not end on an FP64 tail "
+                         f"({st.get('tail')!r})")
+        if not mixed and st.get("rec_none") is not True:
+            probs.append(f"{tag} step {i}: the stock SCF carried a mixed-precision record")
+    return probs
+
+
+def _warm(recs, field):
+    return [st.get(field) if isinstance(st, dict) else None for st in recs[1:]]
+
+
+def _ratio(a, b):
+    try:
+        return a / b if (a is not None and b) else None
+    except Exception:
+        return None
+
+
+def judge_geoopt(mode, cell, runs, expect=None):
+    """PREREG-8 G1 gates: the three optimisations converged within GEO_MAXSTEPS steps; every SCF of
+    every step converged and every mixed one ended on an FP64 tail; at the M0 and MW endpoints the
+    fresh stock gradient meets grms <= 3e-4 and gmax <= 4.5e-4 and |E_stock(endpoint) - E_S(final)|
+    <= 1e-6 Ha. Plus PREREG-0's observation discipline: settings read back, each arm's recorded
+    policy is its own (every step), stock carries none. The fit outcome is DISCLOSED here (PREREG-8
+    gates no fit on G1). Returns (structural, gate, fit, readings)."""
+    structural, gate, fits = [], [], []
+    key = S.cell_key(cell)
+    xc = cell["xc"]
+    readings = {"steps": {}, "fit": {}}
+    order = [r.get("run") for r in runs]
+    if order != list(S.GEOOPT_ARMS):
+        structural.append(f"{key}: runs {order}, expected {list(S.GEOOPT_ARMS)}")
+        return structural, gate, TREATED, readings
+    by = {r["run"]: r for r in runs}
+    for r in runs:
+        arm = r["run"]
+        tag = f"{key} {arm}"
+        if r.get("error"):
+            structural.append(f"{tag}: {r['error']}")
+            continue
+        variant = S.GEOOPT_VARIANT[arm]
+        gate += settings_problems(tag, r, cell, dict(S.GEOOPT_SETTINGS))
+        readings["steps"][arm] = r.get("steps")
+        if r.get("converged") is not True:
+            gate.append(f"{tag}: optimisation did not converge ({r.get('converged')!r})")
+        if not (_count(r.get("steps")) and 1 <= r["steps"] <= S.GEO_MAXSTEPS):
+            gate.append(f"{tag}: {r.get('steps')!r} steps, not within 1..{S.GEO_MAXSTEPS}")
+        gate += _steps_problems(tag, r, variant is not None)
+        if variant is None:
+            if r.get("mp_none") is not True:
+                gate.append(f"{tag}: the stock optimisation carried a policy")
+            continue
+        pols = r.get("policies")
+        want = (expect or {}).get(f"{variant}|{xc}") if isinstance(expect, dict) else None
+        if want is None:
+            gate.append(f"{tag}: no expected policy repr to judge the record against")
+        elif pols != [want]:
+            gate.append(f"{tag}: recorded policies {pols!r} are not [{want!r}]")
+        arm_fits = set()
+        for st in r.get("step") or []:
+            try:
+                arm_fits.add(classify_fit("mixed", xc, {"ao_cache_tier": st.get("tier"),
+                                                        "ao_cache": st.get("note")}))
+            except Exception as e:
+                arm_fits.add(f"unclassifiable ({type(e).__name__})")
+        readings["fit"][arm] = sorted(arm_fits)
+        fits += [f for f in arm_fits if f in FIT_RANK]
+    if structural:
+        return structural, gate, _worst_fit(fits), readings
+    # Endpoint certificates against S's final energy.
+    try:
+        e_s = float(by["S"]["e_final"])
+        if not math.isfinite(e_s):
+            raise ValueError("non-finite")
+    except Exception as e:
+        e_s = None
+        gate.append(f"{key} S: final energy unreadable ({type(e).__name__})")
+    for arm in GEO_MIXED:
+        tag = f"{key} {arm} endpoint"
+        ep = by[arm].get("endpoint")
+        if not isinstance(ep, dict) or ep.get("error"):
+            gate.append(f"{tag}: no stock certificate "
+                        f"({ep.get('error') if isinstance(ep, dict) else ep!r})")
+            continue
+        gate += settings_problems(tag, ep, cell, dict(S.GEOOPT_SETTINGS))
+        if ep.get("converged") is not True or ep.get("mp_none") is not True:
+            gate.append(f"{tag}: the certificate SCF is not a converged stock SCF "
+                        f"(converged={ep.get('converged')!r}, mp_none={ep.get('mp_none')!r})")
+        try:
+            nrm = grad_norms(ep["grad"])
+            readings.setdefault("endpoint", {})[arm] = dict(nrm)
+            if not nrm["grms"] <= S.GEO_CONV["convergence_grms"]:
+                gate.append(f"{tag}: stock grms {nrm['grms']:.3e} > "
+                            f"{S.GEO_CONV['convergence_grms']:g}")
+            if not nrm["gmax"] <= S.GEO_CONV["convergence_gmax"]:
+                gate.append(f"{tag}: stock gmax {nrm['gmax']:.3e} > "
+                            f"{S.GEO_CONV['convergence_gmax']:g}")
+        except Exception as e:
+            gate.append(f"{tag}: gradient unreadable: {type(e).__name__}: {e}"[:300])
+        if e_s is not None:
+            try:
+                de = abs(float(ep["e"]) - e_s)
+                readings.setdefault("endpoint", {}).setdefault(arm, {})["de_vs_S"] = de
+                if not de <= GEO_E_TOL:
+                    gate.append(f"{tag}: |E_stock(endpoint) - E_S(final)| {de:.3e} > {GEO_E_TOL:g}")
+            except Exception as e:
+                gate.append(f"{tag}: energy unreadable: {type(e).__name__}"[:300])
+    readings.update(geoopt_readings(by))
+    return structural, gate, _worst_fit(fits), readings
+
+
+def geoopt_readings(by):
+    """DISCLOSED only (P-F .. P-H): per-arm warm-step cycle deltas against S matched by step index,
+    summed warm-step SCF walls and the stock/mixed ratio, M0's initial orbital-gradient norms, MW's
+    trigger fraction, Kabsch RMSD of the M0 / MW endpoints against S's. Never raises."""
+    out = {}
+    try:
+        s_rec = by["S"].get("step") or []
+        s_cyc = _warm(s_rec, "c")
+        s_wall = [w for w in _warm(s_rec, "t") if _finite_real(w)]
+        out["warm_scf_s"] = {"S": sum(s_wall) if s_wall else None}
+        for arm in GEO_MIXED:
+            rec = by[arm].get("step") or []
+            cyc = _warm(rec, "c")
+            n = min(len(cyc), len(s_cyc))
+            d = [(cyc[i] - s_cyc[i]) if (_count(cyc[i]) and _count(s_cyc[i])) else None
+                 for i in range(n)]
+            dd = [x for x in d if x is not None]
+            fast = [d[i] for i in range(n) if d[i] is not None and s_cyc[i] <= 5]
+            walls = [w for w in _warm(rec, "t") if _finite_real(w)]
+            out["warm_scf_s"][arm] = sum(walls) if walls else None
+            out[f"{arm}_cycle_delta"] = d
+            out[f"{arm}_frac_ge1"] = (sum(x >= 1 for x in dd) / len(dd)) if dd else None
+            out[f"{arm}_frac_ge1_where_S_le5"] = (sum(x >= 1 for x in fast) / len(fast)
+                                                 if fast else None)
+            out[f"{arm}_frac_le0"] = (sum(x <= 0 for x in dd) / len(dd)) if dd else None
+            out[f"{arm}_wall_ratio_S_over"] = _ratio(out["warm_scf_s"]["S"],
+                                                     out["warm_scf_s"][arm])
+            ws = [warm_start_fields(x) for x in _warm(rec, "ws")]
+            if arm == "M0":
+                out["M0_warm_gorb"] = [w[0] for w in ws]
+            else:
+                trig = [w[1] for w in ws]
+                out["MW_trigger_fraction"] = (sum(trig) / len(trig)
+                                              if trig and all(isinstance(t, bool) for t in trig)
+                                              else None)
+            try:
+                out[f"{arm}_kabsch_rmsd_A"] = kabsch_rmsd(
+                    [r[1:] for r in by[arm]["final"]], [r[1:] for r in by["S"]["final"]])
+            except Exception:
+                out[f"{arm}_kabsch_rmsd_A"] = None
+    except Exception as e:
+        out["error"] = f"{type(e).__name__}: {e}"[:200]
+    return out
+
+
 def judge_cell(mode, cell, runs, end, repeats, expect=None):
     """The cell's verdict: {key, status, fit, problems, fails_run, readings}. `end` is the cell's
     RFCBENCH_CELLEND record, or None if the cell never finished (CAP_KILLED). Never raises."""
@@ -559,6 +917,13 @@ def judge_cell(mode, cell, runs, end, repeats, expect=None):
         elif end.get("error"):
             out.update(status=ERROR, problems=[f"{key}: {end['error']}"])
         else:
+            if cell["kind"] in ("attrib", "geoopt"):
+                judge = judge_attrib if cell["kind"] == "attrib" else judge_geoopt
+                structural, gate, fit, readings = judge(mode, cell, runs, expect)
+                out.update(readings=readings, fit=fit, problems=structural + gate,
+                           status=ERROR if structural else (GATE_FAIL if gate else OK))
+                out["fails_run"] = fails_run(mode, out["status"])
+                return out
             if cell["kind"] == "downstream":
                 structural, gate, fit, readings = judge_downstream(mode, cell, runs, expect)
                 out["readings"] = readings
@@ -676,14 +1041,13 @@ def _to_host(x):
     return x
 
 
-def build_and_run(atoms, cell, policy, kind="speed", init_guess=None, hook=None):
-    """One fresh molecule + SCF object, timed sync-to-sync. Returns (mf, run_record). `hook(mf)`, if
-    given, is called on the fully configured object just before the timed kernel (PREREG-rfcbench-7
-    stage timing); every campaign mode before it passes none."""
-    import cupy
+def build_mf(atoms, cell, policy, kind="speed", init_guess=None, settings=None):
+    """A fresh molecule + configured SCF object, not run. `settings` ({conv_tol, conv_tol_grad,
+    max_cycle}, conv_tol_grad None = library default) overrides `kind_settings(kind)`: PREREG-8's
+    per-arm settings. Returns (mol, mf)."""
     import pyscf
     from gpu4pyscf.dft import rks
-    ks = kind_settings(kind)
+    ks = kind_settings(kind) if settings is None else settings
     mol = pyscf.M(atom=atoms, basis=S.BASES[cell["basis"]], verbose=0)
     mf = rks.RKS(mol, xc=cell["xc"])
     mf.grids.level = S.GRID_LEVEL
@@ -696,6 +1060,48 @@ def build_and_run(atoms, cell, policy, kind="speed", init_guess=None, hook=None)
     if init_guess is not None:
         mf.init_guess = init_guess
     mf.mixed_precision = policy
+    return mol, mf
+
+
+def settings_of(mf, mol):
+    """The settings READ BACK off a built-and-run SCF object (PREREG-0 section 1)."""
+    wdf = mf.with_df
+    return {"grid_level": mf.grids.level, "prune_none": mf.grids.prune is None,
+            "ngrids": int(mf.grids.coords.shape[0]), "conv_tol": mf.conv_tol,
+            "max_cycle": mf.max_cycle, "conv_tol_grad": mf.conv_tol_grad,
+            "auxbasis": wdf.auxbasis, "basis": mol.basis,
+            "naux": int(getattr(wdf, "naux", None) or wdf.auxmol.nao),
+            "nao": int(mol.nao), "init_guess": mf.init_guess,
+            "cderi": cderi_storage(wdf)}
+
+
+def record_of(r):
+    """The compact mixed_precision_record of one treated SCF. The PREREG-8 fields (`diis_reset_call`,
+    `warm_start`; 09271907 only) are read with `.get`, so a 63af0568 record still serialises, and
+    `geo_fields` lists which of them the record really carries (a None must be OBSERVED)."""
+    return {
+        "policy": r["policy"], "xc": rle(r["xc"]), "k": rle(r["k"]), "vv10": rle(r["vv10"]),
+        "fp64_tail": r["fp64_tail"], "forced": r["forced"], "ao_cache": r["ao_cache"][:400],
+        "ao_cache_tier": r.get("ao_cache_tier"), "xc_fp64_cached": r.get("xc_fp64_cached"),
+        "xc_fp64_stock": r.get("xc_fp64_stock"), "ao_cache_bytes64": r.get("ao_cache_bytes64"),
+        "ao_cache_bytes32": r.get("ao_cache_bytes32"),
+        "ao_cache_mirror_released_call": r.get("ao_cache_mirror_released_call"),
+        "xc_switch_call": r.get("xc_switch_call"), "k_switch_call": r.get("k_switch_call"),
+        "k_full_rebuild_call": r.get("k_full_rebuild_call"),
+        "cderi_prebuilt": r.get("cderi_prebuilt"), "vv10_n_fp32": r.get("vv10_n_fp32"),
+        "vv10_n_df64": r.get("vv10_n_df64"), "vv10_switch_call": r.get("vv10_switch_call"),
+        "vv10_cert": r.get("vv10_cert"),
+        "diis_reset_call": r.get("diis_reset_call"), "warm_start": r.get("warm_start"),
+        "geo_fields": [f for f in ("diis_reset_call", "warm_start") if f in r]}
+
+
+def build_and_run(atoms, cell, policy, kind="speed", init_guess=None, hook=None, settings=None):
+    """One fresh molecule + SCF object, timed sync-to-sync. Returns (mf, run_record). `hook(mf)`, if
+    given, is called on the fully configured object just before the timed kernel (PREREG-rfcbench-7
+    stage timing); every campaign mode before it passes none. `settings` overrides the kind's SCF
+    settings (PREREG-8 attrib arms); every mode before PREREG-8 passes none."""
+    import cupy
+    mol, mf = build_mf(atoms, cell, policy, kind=kind, init_guess=init_guess, settings=settings)
     if hook is not None:
         hook(mf)
     cupy.cuda.runtime.deviceSynchronize()
@@ -703,32 +1109,12 @@ def build_and_run(atoms, cell, policy, kind="speed", init_guess=None, hook=None)
     e = mf.kernel()
     cupy.cuda.runtime.deviceSynchronize()
     wall = time.perf_counter() - t0
-    wdf = mf.with_df
     run = {"wall_s": round(wall, 4), "e": float(e), "cycles": int(mf.cycles),
-           "converged": bool(mf.converged),
-           "settings": {"grid_level": mf.grids.level, "prune_none": mf.grids.prune is None,
-                        "ngrids": int(mf.grids.coords.shape[0]), "conv_tol": mf.conv_tol,
-                        "max_cycle": mf.max_cycle, "conv_tol_grad": mf.conv_tol_grad,
-                        "auxbasis": wdf.auxbasis, "basis": mol.basis,
-                        "naux": int(getattr(wdf, "naux", None) or wdf.auxmol.nao),
-                        "nao": int(mol.nao), "init_guess": mf.init_guess,
-                        "cderi": cderi_storage(wdf)},
+           "converged": bool(mf.converged), "settings": settings_of(mf, mol),
            "mp_none": mf.mixed_precision is None,
            "rec_none": getattr(mf, "mixed_precision_record", None) is None}
     if policy is not None:
-        r = mf.mixed_precision_record
-        run["rec"] = {
-            "policy": r["policy"], "xc": rle(r["xc"]), "k": rle(r["k"]), "vv10": rle(r["vv10"]),
-            "fp64_tail": r["fp64_tail"], "forced": r["forced"], "ao_cache": r["ao_cache"][:400],
-            "ao_cache_tier": r.get("ao_cache_tier"), "xc_fp64_cached": r.get("xc_fp64_cached"),
-            "xc_fp64_stock": r.get("xc_fp64_stock"), "ao_cache_bytes64": r.get("ao_cache_bytes64"),
-            "ao_cache_bytes32": r.get("ao_cache_bytes32"),
-            "ao_cache_mirror_released_call": r.get("ao_cache_mirror_released_call"),
-            "xc_switch_call": r.get("xc_switch_call"), "k_switch_call": r.get("k_switch_call"),
-            "k_full_rebuild_call": r.get("k_full_rebuild_call"),
-            "cderi_prebuilt": r.get("cderi_prebuilt"), "vv10_n_fp32": r.get("vv10_n_fp32"),
-            "vv10_n_df64": r.get("vv10_n_df64"), "vv10_switch_call": r.get("vv10_switch_call"),
-            "vv10_cert": r.get("vv10_cert")}
+        run["rec"] = record_of(mf.mixed_precision_record)
     return mf, run
 
 
@@ -815,6 +1201,149 @@ def run_downstream_cell(cell, atoms):
             emit("RFCBENCH_CONTROLS", {"key": S.cell_key(cell), "deltas": ctl})
 
 
+def _sync():
+    import cupy
+    cupy.cuda.runtime.deviceSynchronize()
+
+
+def stock_gradient(mf, run):
+    """Dipole, the no-state check and the stock analytic gradient, timed sync-to-sync, into `run`."""
+    run["dip"] = [float(v) for v in _to_host(mf.dip_moment(unit="Debye", verbose=0))]
+    run["state_none"] = getattr(mf, "_mixed_precision_state", None) is None
+    g = mf.nuc_grad_method()
+    run["grad_module"] = type(g).__module__
+    _sync()
+    t0 = time.perf_counter()
+    grad = _to_host(g.kernel())
+    _sync()
+    run["grad_wall_s"] = round(time.perf_counter() - t0, 4)
+    run["grad"] = [[float(v) for v in row] for row in grad]
+
+
+def run_attrib_cell(cell, atoms):
+    """PREREG-8 A1/A2: R', R, S, S2, St, M, Mt, Md, each a fresh SCF from the default guess at its own
+    settings (S.ATTRIB_PLAN), then the dipole and the stock analytic gradient. One RFCBENCH_CELL line
+    per arm, as it lands."""
+    from gpu4pyscf.dft.mixed_precision import MixedPrecision
+    for arm in S.ATTRIB_ARMS:
+        variant, settings = S.ATTRIB_PLAN[arm]
+        run = {"run": arm}
+        mf = None
+        release_previous()
+        try:
+            kw = variant_kwargs(variant, cell["xc"])
+            mf, rec = build_and_run(atoms, cell, None if kw is None else MixedPrecision(**kw),
+                                    settings=dict(settings))
+            run.update(rec)
+            stock_gradient(mf, run)
+        except Exception as e:
+            run["error"] = f"{type(e).__name__}: {e}"[:300]
+        mf = None
+        emit("RFCBENCH_CELL", {"key": S.cell_key(cell), "run": arm, "runs": [run]})
+
+
+def geometric_kernel(scanner, callback, maxsteps):
+    """pyscf's geomeTRIC driver at PREREG-8's convergence set (l3bcomm.CommOps.geometric_kernel)."""
+    from pyscf.geomopt import geometric_solver
+    return geometric_solver.kernel(scanner, maxsteps=int(maxsteps), callback=callback,
+                                   **S.GEO_CONV)
+
+
+def geoopt_arm(atoms, cell, policy, geo_kernel=None):
+    """One optimisation through the gradient scanner. TIMING METHOD: the scanner's SCF
+    (`scanner.base.kernel`) and its gradient (`scanner.kernel`) are each wrapped on the instance by a
+    deviceSynchronize-to-deviceSynchronize perf_counter timer, so per step the SCF wall (DF and grid
+    rebuild included, as the campaign measurand) and the gradient wall are separate and synchronised.
+    The SCF wrapper also reads the step's cycles, convergence, energy and (mixed) record right after
+    the SCF returns, before the gradient runs. geomeTRIC's callback counts the steps."""
+    mol, mf = build_mf(atoms, cell, policy, settings=dict(S.GEOOPT_SETTINGS))
+    out = {"mp_none": mf.mixed_precision is None, "step": [], "policies": []}
+    scanner = mf.nuc_grad_method().as_scanner()
+    base = scanner.base
+    scf_kernel, grad_kernel = base.kernel, scanner.kernel
+    steps = out["step"]
+
+    def timed_scf(*a, **k):
+        _sync()
+        t0 = time.perf_counter()
+        e = scf_kernel(*a, **k)
+        _sync()
+        st = {"c": int(base.cycles), "ok": bool(base.converged), "e": float(e),
+              "t": round(time.perf_counter() - t0, 4), "g": None}
+        if "settings" not in out:
+            out["settings"] = settings_of(base, base.mol)
+        rec = getattr(base, "mixed_precision_record", None)
+        if policy is None:
+            st["rec_none"] = rec is None
+        elif not isinstance(rec, dict):         # recorded, so the gate fails on it; never raised
+            st.update(tail=None, rec_missing=True)
+        else:
+            st.update(xc=rle(rec["xc"]), k=rle(rec["k"]), vv10=rle(rec["vv10"]),
+                      tail=rec["fp64_tail"], ws=rec.get("warm_start"),
+                      tier=rec.get("ao_cache_tier"), note=str(rec["ao_cache"])[:160])
+            if rec["policy"] not in out["policies"]:
+                out["policies"].append(rec["policy"])
+        steps.append(st)
+        return e
+
+    def timed_grad(*a, **k):
+        _sync()
+        t0 = time.perf_counter()
+        g = grad_kernel(*a, **k)
+        _sync()
+        if steps:
+            steps[-1]["g"] = round(time.perf_counter() - t0, 4)
+        return g
+
+    base.kernel = timed_scf
+    scanner.kernel = timed_grad
+    n_cb = [0]
+
+    def callback(envs):
+        n_cb[0] += 1
+
+    t0 = time.perf_counter()
+    conv, mol_eq = (geo_kernel or geometric_kernel)(scanner, callback, S.GEO_MAXSTEPS)
+    out["wall_s"] = round(time.perf_counter() - t0, 2)
+    coords = _to_host(mol_eq.atom_coords(unit="Angstrom"))
+    out.update(converged=bool(conv), steps=n_cb[0], scf_calls=len(steps),
+               e_final=steps[-1]["e"] if steps else None,
+               final=[[mol_eq.atom_symbol(i)] + [float(v) for v in coords[i]]
+                      for i in range(mol_eq.natm)])
+    return out
+
+
+def endpoint_eval(final, cell):
+    """PREREG-8: a fresh stock SCF (default guess, campaign settings) and the stock gradient at an
+    optimisation's final coordinates (Angstrom)."""
+    atoms = [(r[0], tuple(r[1:])) for r in final]
+    mf, run = build_and_run(atoms, cell, None, settings=dict(S.GEOOPT_SETTINGS))
+    stock_gradient(mf, run)
+    return run
+
+
+def run_geoopt_cell(cell, atoms, geo_kernel=None):
+    """PREREG-8 G1: M0, MW, S in that order; after each mixed optimisation its stock certificate.
+    One RFCBENCH_CELL line per arm."""
+    from gpu4pyscf.dft.mixed_precision import MixedPrecision
+    for arm in S.GEOOPT_ARMS:
+        run = {"run": arm}
+        release_previous()
+        try:
+            kw = variant_kwargs(S.GEOOPT_VARIANT[arm], cell["xc"])
+            run.update(geoopt_arm(atoms, cell, None if kw is None else MixedPrecision(**kw),
+                                  geo_kernel=geo_kernel))
+        except Exception as e:
+            run["error"] = f"{type(e).__name__}: {e}"[:300]
+        if S.GEOOPT_VARIANT[arm] is not None and "final" in run:
+            release_previous()
+            try:
+                run["endpoint"] = endpoint_eval(run["final"], cell)
+            except Exception as e:
+                run["endpoint"] = {"error": f"{type(e).__name__}: {e}"[:300]}
+        emit("RFCBENCH_CELL", {"key": S.cell_key(cell), "run": arm, "runs": [run]})
+
+
 def main(argv):
     """`--group <json>`: {"cells": [...], "repeats": R}. Streams lines; never judges."""
     spec = json.loads(argv[argv.index("--group") + 1])
@@ -829,6 +1358,10 @@ def main(argv):
             atoms = read_atoms(cell["mol"])
             if cell["kind"] == "downstream":
                 run_downstream_cell(cell, atoms)
+            elif cell["kind"] == "attrib":
+                run_attrib_cell(cell, atoms)
+            elif cell["kind"] == "geoopt":
+                run_geoopt_cell(cell, atoms)
             else:
                 run_speed_cell(cell, spec["repeats"], atoms)
         except Exception as e:
