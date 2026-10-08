@@ -127,7 +127,8 @@ class MixedPrecision:
     def __init__(self, xc=False, k=False, vv10=False, xc_switch_tol=XC_SWITCH_TOL,
                  k_switch_tol=K_SWITCH_TOL, vv10_switch_tol=VV10_SWITCH_TOL,
                  stall=SWITCH_STALL, call_cap=SWITCH_CALL_CAP,
-                 ao_cache_mem_fraction=AO_CACHE_MEM_FRACTION, ao_cache_fp64=False):
+                 ao_cache_mem_fraction=AO_CACHE_MEM_FRACTION, ao_cache_fp64=False,
+                 diis_reset_at_switch=False, warm_start_gorb=None):
         self.xc = bool(xc)
         self.k = bool(k)
         self.vv10 = bool(vv10)
@@ -138,13 +139,29 @@ class MixedPrecision:
         self.call_cap = int(call_cap)
         self.ao_cache_mem_fraction = float(ao_cache_mem_fraction)
         self.ao_cache_fp64 = bool(ao_cache_fp64)
+        # Restart the DIIS subspace on the first iteration built entirely in FP64, so no
+        # FP32-phase Fock or error vector enters the tail's extrapolation.
+        self.diis_reset_at_switch = bool(diis_reset_at_switch)
+        # Warm start: when the SCF starts from a supplied density with orbitals (for example a
+        # scanner's previous geometry) and the orbital-gradient norm of the initial Fock is below
+        # this value, every later call runs in FP64. None disables the rule.
+        if warm_start_gorb is not None:
+            warm_start_gorb = float(warm_start_gorb)
+            if not warm_start_gorb > 0:
+                raise ValueError('warm_start_gorb must be positive or None')
+        self.warm_start_gorb = warm_start_gorb
 
     def __repr__(self):
+        extra = ''
+        if self.diis_reset_at_switch:
+            extra += ', diis_reset_at_switch=True'
+        if self.warm_start_gorb is not None:
+            extra += f', warm_start_gorb={self.warm_start_gorb:g}'
         return (f'MixedPrecision(xc={self.xc}, k={self.k}, vv10={self.vv10}, '
                 f'xc_switch_tol={self.xc_switch_tol:g}, '
                 f'k_switch_tol={self.k_switch_tol:g}, '
                 f'vv10_switch_tol={self.vv10_switch_tol:g}, '
-                f'ao_cache_fp64={self.ao_cache_fp64})')
+                f'ao_cache_fp64={self.ao_cache_fp64}{extra})')
 
 
 class PhaseController:
@@ -287,8 +304,10 @@ class _SCFState:
         self.k_ran_fp32 = False
         self.k_rebuilt = False
         self.clean_streak = 0
+        self.just_clean = False
         self.forced = ''
         self.record = {'policy': repr(policy), 'xc': [], 'k': [],
+                       'diis_reset_call': None, 'warm_start': None,
                        'k_full_rebuild_call': None, 'ao_cache': '', 'forced': '',
                        'vv10': [], 'vv10_n_masked': [], 'vv10_cert': None,
                        'xc_path': []}
@@ -372,6 +391,8 @@ class _SCFState:
         clean = (cur['xc'] == FP64 and cur['k_applied'] == FP64 and k_clean
                  and cur['vv10'] != FP32)
         self.clean_streak = self.clean_streak + 1 if clean else 0
+        # The first clean call after at least one call that was not: the switch has landed.
+        self.just_clean = clean and self.clean_streak == 1 and self.call > 1
         self.record['xc'].append(cur['xc'])
         self.record['xc_path'].append(cur['xc_path'])
         self.record['k'].append(cur['k_applied'])

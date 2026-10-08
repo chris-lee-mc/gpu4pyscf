@@ -215,6 +215,26 @@ def energy_elec(mf, dm=None, h1e=None, vhf=None):
     logger.debug(mf, 'E1 = %s  E2 = %s  Ecoul = %s  Exc = %s', e1, e2, ecoul, exx)
     return e1+e2, e2
 
+def _mixed_precision_warm_start(mf, mp_state, dm, h1e, s1e, vhf, dm0_supplied, log):
+    '''Mixed precision, warm start: with a supplied density that carries orbitals, measure the
+    orbital-gradient norm of the initial Fock and, below the policy's threshold, run every later
+    call in FP64. The initial call itself has already run; its FP32 contribution is removed by the
+    usual FP64-tail rule.'''
+    tol = mp_state.policy.warm_start_gorb
+    mo_coeff = getattr(dm, 'mo_coeff', None)
+    mo_occ = getattr(dm, 'mo_occ', None)
+    rec = {'tol': tol, 'supplied': bool(dm0_supplied), 'gorb': None, 'fp64': False}
+    if dm0_supplied and mo_coeff is not None and mo_occ is not None:
+        fock = mf.get_fock(h1e, s1e, vhf, dm)
+        gorb = float(cupy.linalg.norm(mf.get_grad(mo_coeff, mo_occ, fock)))
+        rec['gorb'] = gorb
+        if gorb < tol:
+            mp_state.force_fp64(f'warm start |g|={gorb:.3e} < {tol:g}')
+            rec['fp64'] = True
+            log.info('mixed precision: warm start |g|=%.3e < %g, FP64 from call 2', gorb, tol)
+    mp_state.record['warm_start'] = rec
+
+
 def _kernel(mf, conv_tol=1e-10, conv_tol_grad=None,
            dump_chk=True, dm0=None, callback=None, conv_check=True, **kwargs):
     conv_tol = mf.conv_tol
@@ -226,6 +246,7 @@ def _kernel(mf, conv_tol=1e-10, conv_tol_grad=None,
         conv_tol_grad = conv_tol**.5
         log.info('Set gradient conv threshold to %g', conv_tol_grad)
 
+    dm0_supplied = dm0 is not None
     if dm0 is None:
         dm0 = mf.get_init_guess(mol, mf.init_guess)
         t1 = log.timer_debug1('generating initial guess', *t1)
@@ -248,6 +269,9 @@ def _kernel(mf, conv_tol=1e-10, conv_tol_grad=None,
     vhf = mf.get_veff(mol, dm)
     e_tot = mf.energy_tot(dm, h1e, vhf)
     log.info('init E= %.15g', e_tot)
+    mp_state = getattr(mf, '_mixed_precision_state', None)
+    if mp_state is not None and mp_state.policy.warm_start_gorb is not None:
+        _mixed_precision_warm_start(mf, mp_state, dm, h1e, s1e, vhf, dm0_supplied, log)
     x_orth = mf.check_linear_dependency(s1e, log)
     t1 = log.timer('SCF initialization', *t0)
     scf_conv = False
@@ -259,18 +283,22 @@ def _kernel(mf, conv_tol=1e-10, conv_tol_grad=None,
         mo_occ = mf.get_occ(mo_energy, mo_coeff)
         return scf_conv, e_tot, mo_energy, mo_coeff, mo_occ
 
+    def new_diis():
+        assert issubclass(mf.DIIS, lib.diis.DIIS)
+        d = mf.DIIS(mf, mf.diis_file)
+        d.space = mf.diis_space
+        d.rollback = mf.diis_space_rollback
+        # CDIIS just require a C that's orthonormal (C.T@S@C==I), and X satisfies that.
+        if isinstance(x_orth, list): # k point
+            d.Corth = stack_with_padding(x_orth)
+        else:
+            d.Corth = cupy.asarray(x_orth)
+        return d
+
     if isinstance(mf.diis, lib.diis.DIIS):
         mf_diis = mf.diis
     elif mf.diis:
-        assert issubclass(mf.DIIS, lib.diis.DIIS)
-        mf_diis = mf.DIIS(mf, mf.diis_file)
-        mf_diis.space = mf.diis_space
-        mf_diis.rollback = mf.diis_space_rollback
-        # CDIIS just require a C that's orthonormal (C.T@S@C==I), and X satisfies that.
-        if isinstance(x_orth, list): # k point
-            mf_diis.Corth = stack_with_padding(x_orth)
-        else:
-            mf_diis.Corth = cupy.asarray(x_orth)
+        mf_diis = new_diis()
     else:
         mf_diis = None
 
@@ -301,6 +329,13 @@ def _kernel(mf, conv_tol=1e-10, conv_tol_grad=None,
         vhf = mf.get_veff(mol, dm, dm_last, vhf)
         dm = asarray(dm) # Remove the attached attributes
         t1 = log.timer_debug1('veff', *t1)
+        if (mp_state is not None and mp_state.just_clean
+                and mp_state.policy.diis_reset_at_switch and mf_diis is not None
+                and not isinstance(mf.diis, lib.diis.DIIS)):
+            # Mixed precision: drop the FP32-phase vectors from the DIIS subspace.
+            mf_diis = new_diis()
+            mp_state.record['diis_reset_call'] = mp_state.call
+            log.info('mixed precision: DIIS subspace restarted at call %d', mp_state.call)
 
         fock = mf.get_fock(h1e, s1e, vhf, dm)  # = h1e + vhf, no DIIS
         e_tot = mf.energy_tot(dm, h1e, vhf)

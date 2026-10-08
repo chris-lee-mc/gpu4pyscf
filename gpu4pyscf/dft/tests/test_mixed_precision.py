@@ -458,6 +458,78 @@ AO_FRACTION = mp.AO_CACHE_MEM_FRACTION
 MIN_BLK = __import__('gpu4pyscf.dft.numint', fromlist=['MIN_BLK_SIZE']).MIN_BLK_SIZE
 
 
+class GeometrySafety(unittest.TestCase):
+    """The DIIS restart at the switch and the warm-start rule. Both default off."""
+
+    def test_new_options_default_off_and_repr_unchanged(self):
+        p = MixedPrecision(xc=True, k=True)
+        self.assertFalse(p.diis_reset_at_switch)
+        self.assertIsNone(p.warm_start_gorb)
+        self.assertNotIn('diis_reset', repr(p))
+        self.assertNotIn('warm_start', repr(p))
+        q = MixedPrecision(xc=True, diis_reset_at_switch=True, warm_start_gorb=1e-2)
+        self.assertIn('diis_reset_at_switch=True', repr(q))
+        self.assertIn('warm_start_gorb=0.01', repr(q))
+        for bad in (0, -1e-3, float('nan')):
+            with self.assertRaises(ValueError):
+                MixedPrecision(xc=True, warm_start_gorb=bad)
+
+    def test_diis_reset_at_the_first_clean_call(self):
+        mf0, e0 = run(mol_p, 'b3lyp')
+        policy = MixedPrecision(xc=True, k=True, xc_switch_tol=3e-4, diis_reset_at_switch=True)
+        mf1, e1 = run(mol_p, 'b3lyp', policy)
+        rec = mf1.mixed_precision_record
+        self.assertAlmostEqual(e1, e0, delta=ETOL)
+        self.assertLessEqual(abs(mf1.cycles - mf0.cycles), 2)
+        self.assertTrue(rec['fp64_tail'])
+        calls = rec['xc']
+        self.assertIn('fp32', calls)
+        # the reset lands on the first call built entirely in FP64 (XC and K)
+        first_clean = next(c for c, (x, k) in enumerate(zip(rec['xc'], rec['k']), 1)
+                           if c > 1 and x == 'fp64' and k == 'fp64')
+        self.assertEqual(rec['diis_reset_call'], first_clean)
+
+    def test_no_diis_reset_unless_asked(self):
+        mf, _ = run(mol_p, 'b3lyp', MixedPrecision(xc=True, k=True, xc_switch_tol=3e-4))
+        self.assertIsNone(mf.mixed_precision_record['diis_reset_call'])
+
+    def _scanner_pair(self, policy):
+        mol2 = mol_w.set_geom_('''
+            O  0.0  0.0  0.1184
+            H -0.7580 0.0 -0.4706
+            H  0.7580 0.0 -0.4706''', inplace=False)
+        scanner = make_mf(mol_w, 'pbe', policy).as_scanner()
+        scanner(mol_w)
+        cold = scanner.mixed_precision_record
+        e_warm = scanner(mol2)
+        warm = scanner.mixed_precision_record
+        _, e_ref = run(mol2, 'pbe')
+        return cold, warm, e_warm, e_ref
+
+    def test_warm_start_runs_fp64_after_the_first_call(self):
+        cold, warm, e_warm, e_ref = self._scanner_pair(MixedPrecision(xc=True, warm_start_gorb=1.0))
+        self.assertFalse(cold['warm_start']['supplied'])       # first geometry: from the guess
+        self.assertIn('fp32', cold['xc'][1:])
+        ws = warm['warm_start']
+        self.assertTrue(ws['supplied'] and ws['fp64'])
+        self.assertLess(ws['gorb'], 1.0)
+        self.assertEqual(warm['xc'][0], 'fp32')                 # the initial call already ran
+        self.assertTrue(all(p == 'fp64' for p in warm['xc'][1:]))
+        self.assertTrue(warm['fp64_tail'])
+        self.assertAlmostEqual(e_warm, e_ref, delta=ETOL)
+
+    def test_warm_start_below_threshold_is_not_triggered(self):
+        _, warm, e_warm, e_ref = self._scanner_pair(MixedPrecision(xc=True, warm_start_gorb=1e-12))
+        self.assertTrue(warm['warm_start']['supplied'])
+        self.assertFalse(warm['warm_start']['fp64'])
+        self.assertIn('fp32', warm['xc'][1:])
+        self.assertAlmostEqual(e_warm, e_ref, delta=ETOL)
+
+    def test_no_warm_start_record_unless_asked(self):
+        mf, _ = run(mol_w, 'pbe', MixedPrecision(xc=True))
+        self.assertIsNone(mf.mixed_precision_record['warm_start'])
+
+
 if __name__ == "__main__":
     print("Tests for opt-in mixed-precision DF-RKS")
     unittest.main()
