@@ -1148,6 +1148,99 @@ check_true("N8", "PREREG-7 pods: ST2 is the only CONTENDED one; L12r and L12r2 a
            and [pod(p)["degraded"] for p in ("l12r", "l12r2", "x3r")] == ["True", "True", "False"])
 
 
+# --------------------------------------------------------------------------------------------- #
+# N9. Downstream attribution (PREREG-4 erratum 2): the same-guess stock arm S, read from the raw
+# gradient and dipole vectors each downstream sentinel prints (RFCBENCH_CELL, one line per arm).
+# --------------------------------------------------------------------------------------------- #
+def _ds_arms():
+    import json
+    out = {}
+    for p in ("c0", "d1", "d2a", "d2b", "d2c"):
+        for ln in _sentinel(p).decode().splitlines():
+            if ln.startswith("RFCBENCH_CELL ") and '"downstream/' in ln:
+                d = json.loads(ln.split(" ", 1)[1])
+                arms = out.setdefault((p, d["key"]), {})
+                if "run" in d:                       # D1/D2: one line per arm
+                    arms[d["run"]] = d["runs"][-1]
+                else:                                # C0: one line, every arm in `runs`
+                    for r in d["runs"]:
+                        arms[r["run"]] = r
+    return out
+
+
+def _flat(v):
+    return [x for row in v for x in (row if isinstance(row, list) else [row])]
+
+
+def _vd(cell, a, b, what="grad"):
+    va, vb = _flat(cell[a][what]), _flat(cell[b][what])
+    if len(va) != len(vb) or not va:
+        raise ValueError(f"{what} vectors differ in length or are empty")
+    return max(abs(x - y) for x, y in zip(va, vb))
+
+
+def _cos(cell, a, b, ref="R"):
+    va, vb, vr = (_flat(cell[k]["grad"]) for k in (a, b, ref))
+    dot = lambda u, w: sum((x - z) * (y - z) for x, y, z in zip(u, w, vr))
+    return dot(va, vb) / math.sqrt(dot(va, va) * dot(vb, vb))
+
+
+try:
+    ARMS = _ds_arms()
+except Exception as _e:      # fail every N9 check, never crash the verifier
+    ARMS = {}
+    results.append(("N9", "downstream arms parsed from the sentinels", f"ERROR {type(_e).__name__}: {_e}", "True", False))
+DS18 = [k for k in ARMS if k[0] != "c0"]
+_by = lambda xc: [ARMS[k] for k in DS18 if f"/{xc}/" in k[1]]
+_ome_b3 = ("d1", "downstream/omeprazole/b3lyp/mtzvpp")
+check_true("N9", "18 downstream cells, each with arms R, S, Sp and M",
+           lambda: len(DS18) == 18 and all(set(ARMS[k]) == {"R", "S", "Sp", "M"} for k in DS18))
+for xc, lo, hi in (("r2scan", "3.8e-9", "5.3e-8"), ("wb97m-v", "1.2e-8", "3.2e-8")):
+    check("N9", f"{xc}: lowest max |g_M - g_S| (Ha/Bohr)", lambda xc=xc: min(_vd(c, "M", "S") for c in _by(xc)), lo)
+    check("N9", f"{xc}: highest max |g_M - g_S| (Ha/Bohr)", lambda xc=xc: max(_vd(c, "M", "S") for c in _by(xc)), hi)
+_b3 = lambda: [ARMS[k] for k in DS18 if "/b3lyp/" in k[1] and k != _ome_b3]
+check("N9", "B3LYP but omeprazole: lowest max |g_M - g_S|", lambda: min(_vd(c, "M", "S") for c in _b3()), "2.1e-8")
+check("N9", "B3LYP but omeprazole: highest max |g_M - g_S|", lambda: max(_vd(c, "M", "S") for c in _b3()), "2.7e-7")
+for xc, lo, hi in (("r2scan", "3.0e-7", "2.4e-6"), ("wb97m-v", "1.2e-12", "5.9e-12")):
+    check("N9", f"{xc}: lowest max |mu_M - mu_S| (D)", lambda xc=xc: min(_vd(c, "M", "S", "dip") for c in _by(xc)), lo)
+    check("N9", f"{xc}: highest max |mu_M - mu_S| (D)", lambda xc=xc: max(_vd(c, "M", "S", "dip") for c in _by(xc)), hi)
+check("N9", "B3LYP but omeprazole: lowest max |mu_M - mu_S| (D)", lambda: min(_vd(c, "M", "S", "dip") for c in _b3()), "2.0e-7")
+check("N9", "B3LYP but omeprazole: highest max |mu_M - mu_S| (D)", lambda: max(_vd(c, "M", "S", "dip") for c in _b3()), "9.3e-6")
+check("N9", "omeprazole B3LYP: max |g_M - g_S|", lambda: _vd(ARMS[_ome_b3], "M", "S"), "4.4e-6")
+check("N9", "omeprazole B3LYP: max |mu_M - mu_S| (D)", lambda: _vd(ARMS[_ome_b3], "M", "S", "dip"), "1.9e-4")
+check("N9", "omeprazole B3LYP: max |g_M - g_R|", lambda: _vd(ARMS[_ome_b3], "M", "R"), "1.00e-6")
+check("N9", "omeprazole B3LYP: max |g_S - g_R|", lambda: _vd(ARMS[_ome_b3], "S", "R"), "3.39e-6")
+check("N9", "omeprazole B3LYP: S-R over M-R", lambda: _vd(ARMS[_ome_b3], "S", "R") / _vd(ARMS[_ome_b3], "M", "R"), "3.4")
+check_true("N9", "omeprazole B3LYP: cycles S 13, M 14; every other cell S and M equal",
+           lambda: (ARMS[_ome_b3]["S"]["cycles"], ARMS[_ome_b3]["M"]["cycles"]) == (13, 14)
+           and all(ARMS[k]["S"]["cycles"] == ARMS[k]["M"]["cycles"] for k in DS18 if k != _ome_b3))
+_rest = lambda: [ARMS[k] for k in DS18 if k != _ome_b3]
+check("N9", "17 cells: lowest cosine of (g_M - g_R, g_S - g_R)", lambda: min(_cos(c, "M", "S") for c in _rest()), "0.98")
+_rel = lambda c: abs(_vd(c, "M", "R") - _vd(c, "S", "R")) / _vd(c, "S", "R")
+check_true("N9", "|M-R| within 3 % of |S-R| in 16 cells; fluconazole B3LYP within 21 %",
+           lambda: sum(_rel(c) <= 0.03 for c in _rest()) == 16
+           and round(_rel(ARMS[("d1", "downstream/fluconazole/b3lyp/mtzvpp")]), 2) == 0.21)
+check("N9", "lowest max |g_M - g_R| over 18 cells", lambda: min(_vd(ARMS[k], "M", "R") for k in DS18), "6.6e-7")
+check("N9", "highest max |g_S - g_R| over 18 cells", lambda: max(_vd(ARMS[k], "S", "R") for k in DS18), "3.4e-6")
+check("N9", "fluconazole r2SCAN: max |mu_M - mu_R| (the D1 FAIL), D",
+      lambda: _vd(ARMS[("d1", "downstream/fluconazole/r2scan/mtzvpp")], "M", "R", "dip"), "1.004e-4")
+check("N9", "fluconazole r2SCAN: max |mu_S - mu_R|, D",
+      lambda: _vd(ARMS[("d1", "downstream/fluconazole/r2scan/mtzvpp")], "S", "R", "dip"), "9.93e-5")
+check("N9", "fluconazole r2SCAN: max |mu_M - mu_S|, D",
+      lambda: _vd(ARMS[("d1", "downstream/fluconazole/r2scan/mtzvpp")], "M", "S", "dip"), "1.05e-6")
+check("N9", "omeprazole B3LYP: max |mu_S - mu_R| (stock above the 1e-4 D ceiling)",
+      lambda: _vd(ARMS[_ome_b3], "S", "R", "dip"), "1.57e-4")
+_para = ("d1", "downstream/paracetamol/r2scan/mtzvpp")
+check("N9", "paracetamol r2SCAN (D1): max |g_S - g_R|", lambda: _vd(ARMS[_para], "S", "R"), "1.36e-6")
+check("N9", "paracetamol r2SCAN (D1): max |g_M - g_S|", lambda: _vd(ARMS[_para], "M", "S"), "9.9e-9")
+check("N9", "paracetamol r2SCAN (C0): max |g_M - g_S|",
+      lambda: _vd(ARMS[("c0", "downstream/paracetamol/r2scan/mtzvpp")], "M", "S"), "9.0e-9")
+check("N9", "cosine of (g_Sp - g_R, g_S - g_R): lowest over 18 cells",
+      lambda: min(_cos(ARMS[k], "Sp", "S") for k in DS18), "-0.79")
+check("N9", "cosine of (g_Sp - g_R, g_S - g_R): highest over 18 cells",
+      lambda: max(_cos(ARMS[k], "Sp", "S") for k in DS18), "0.88")
+
+
 def data_integrity():
     """Every file in data/ must be listed in data/SHA256SUMS with a matching hash, and every listed
     file must exist: a missing, extra or edited data file is a FAIL before any number is read."""
@@ -1171,7 +1264,7 @@ def data_integrity():
     return probs
 
 
-EXPECTED_CHECKS = 702   # pinned: a check that silently disappears (or appears) is a FAIL
+EXPECTED_CHECKS = 734   # pinned: a check that silently disappears (or appears) is a FAIL
 
 
 def main():

@@ -193,30 +193,60 @@ arithmetic's gain, with the cache's own gain removed.
   1.633) and is not claimed.
 - The L40S row rests on a single pod per cell.
 
-## C4. Accuracy: 17 of 18 downstream cells are within every ceiling `[N4, N7]`
+## C4. Accuracy: mixed converges to stock's own iterate; the precision imprint is 4e-9 to 2.7e-7 Ha/Bohr `[N4, N7, N9]`
 
-- **Ceilings:** max |Δg| 1e-5 Ha/Bohr, max |Δμ| 1e-4 D, |ΔE| 1e-8 Ha.
-- **Reference:** a tight stock SCF (`conv_tol 1e-11`, `conv_tol_grad 3e-6`).
-- **Gradients:** every gradient is within the ceiling with ≥ 3× margin; the largest is 3.10e-6
-  Ha/Bohr.
-- **Energies:** every |ΔE| is ≤ 1.6e-10 Ha.
-- These two bounds pool D1's UNQUOTABLE cells with D2's. On the quotable D2 cells alone, the largest
-  gradient is still 3.10e-6, on propranolol wB97M-V.
-- **The one FAIL:** fluconazole r2SCAN's dipole, at 1.004e-4 D. Its pod, D1, is `STATUS=FAIL`, so
-  all 12 of D1's numbers are **UNQUOTABLE** under PREREG-0 Amendment 1. They are shown here with that
-  label.
-- **What stock itself reaches.** Stock started from `init_guess='atom'` (S′), rather than the
-  default guess, reaches 1.058e-4 D on celecoxib B3LYP. So the dipole ceiling is **of the same order
-  as stock's own dependence on the initial guess** at these settings. A same-guess stock comparator
-  was not recorded. ρ (mixed's deviation over S′'s) uses a single S′ sample.
-- **Mixed-specific residual (ρ > 3):** r2SCAN paracetamol (ρ_g 4.09, ρ_μ 8.56), wB97M-V propranolol
-  (ρ_μ 4.89) and wB97M-V fluconazole (ρ_μ 3.97).
-  - r2SCAN paracetamol's gradient residual reproduces on two pods: 1.368e-6 on C0 and 1.369e-6 on
-    D1. It is systematic, not noise.
-- **Predicted gradient ≤ 1e-6 Ha/Bohr:** missed in **14 of 18** cells (8 of 12 in D1). PREREG-4's
-  RESULT printed 15 and 9; see the ledger.
-- **Not covered:** the mode does not touch gradients or Hessians, which run stock. No geometry
-  optimisation was run end to end.
+**Setup.** Each downstream cell ran four arms:
+- R, a tight stock reference (`conv_tol 1e-11`, `conv_tol_grad 3e-6`);
+- **S, stock with M's own guess and settings**;
+- S′, stock from `init_guess='atom'`;
+- M, mixed.
+
+The campaign SCFs use `conv_tol 1e-9` and the library-default `conv_tol_grad` √1e-9 = 3.16e-5.
+
+**The comparison that isolates precision is M against S.** Before 2026-10-08 this section compared
+M with R. The S arm was recorded in every sentinel but never read (see the ledger).
+
+| | gradient, max \|M−S\| (Ha/Bohr) | dipole, max \|M−S\| (D) |
+|---|---|---|
+| r2SCAN (6 cells) | 3.8e-9 – 5.3e-8 | 3.0e-7 – 2.4e-6 |
+| B3LYP (5 cells) | 2.1e-8 – 2.7e-7 | 2.0e-7 – 9.3e-6 |
+| wB97M-V (6 cells) | 1.2e-8 – 3.2e-8 | 1.2e-12 – 5.9e-12 |
+| omeprazole B3LYP | 4.4e-6 | 1.9e-4 |
+
+- **In 17 of 18 cells, M and S stop at essentially the same iterate.**
+  - M−R and S−R point the same way (cosine +0.98 to +1.000).
+  - Their magnitudes agree within 3 % in 16 cells, and within 21 % in fluconazole B3LYP.
+  - What remains between them, M−S, is the precision imprint.
+- **The wB97M-V cells pin a floor.** There the densities agree to 1e-12 D, yet the gradients still
+  differ by 1–3e-8. So about 1e-8 Ha/Bohr is the agreement floor between two independently built
+  SCF objects. The r2SCAN imprint sits at that floor; B3LYP's (FP32 K as well as XC) is above it,
+  up to 2.7e-7.
+- **Omeprazole B3LYP is the exception, in the other direction.** M ran one more cycle than S (14 vs
+  13) and landed **3.4× closer to R** than stock did: 1.00e-6 against 3.39e-6.
+- **Against R, both arms carry the same convergence-tolerance residual:**
+  - gradients 6.6e-7 – 3.4e-6 Ha/Bohr;
+  - dipoles up to 1.57e-4 D for stock S (omeprazole B3LYP) and 1.004e-4 D for M (fluconazole
+    r2SCAN).
+  - That residual is set by `conv_tol_grad`, not by precision. Tightening `conv_tol_grad` is what
+    reduces it, for stock and mixed alike.
+- **Gates, as computed and unchanged:**
+  - ceilings are max |Δg| 1e-5 Ha/Bohr, max |Δμ| 1e-4 D and |ΔE| 1e-8 Ha, all against R;
+  - every |ΔE| is ≤ 1.6e-10 Ha;
+  - **one FAIL:** fluconazole r2SCAN's dipole, at 1.004e-4 D. It is the tolerance residual: stock
+    S−R is 9.93e-5 D, and M−S is 1.05e-6 D.
+  - The FAIL makes D1 `STATUS=FAIL`, so all 12 of D1's numbers are **UNQUOTABLE** under PREREG-0
+    Amendment 1. They are shown here with that label.
+  - Stock S would itself breach the dipole ceiling on omeprazole B3LYP.
+- **Withdrawn:**
+  - the "mixed-specific residual (ρ > 3)" readings;
+  - the statement that r2SCAN paracetamol's 1.37e-6 residual is a systematic property of the mode.
+    It reproduces across pods because stock reproduces it (S−R 1.36e-6; M−S 9.9e-9 on D1, 9.0e-9 on
+    C0).
+  - ρ compared two independently oriented tolerance residuals (cosine of S′−R against S−R ranges
+    from −0.79 to +0.88). It says nothing about precision.
+- **Not covered.** The mode does not touch gradients or Hessians, which run stock. No geometry
+  optimisation was run end to end. Warm-started SCFs, as in an optimiser's later steps, were not
+  measured (see the open questions in the ledger).
 
 ## Deployment notes, not claims: MIG and a concurrent whole card `[N5, N6, N7, N8]`
 
@@ -371,7 +401,9 @@ is a fresh process with the caches as shown. Cold extra = cold wall − warm wal
     0.905 / 0.577).
 - PREREG-3: XL B3LYP (below); basis predictions: r2SCAN and B3LYP at SVP (above), B3LYP at TZVP
   (below).
-- PREREG-4: gradient ≤ 1e-6 (14 of 18); gradient ≤ 3 × S′ (1 of 18: r2SCAN paracetamol).
+- PREREG-4: gradient ≤ 1e-6 (14 of 18); gradient ≤ 3 × S′ (1 of 18: r2SCAN paracetamol). Both are
+  misses about stock's convergence floor at the campaign's `conv_tol_grad`, not about precision
+  (PREREG-4 erratum 2).
 - PREREG-2, A100: the predictions (precision effect 0.95 / 1.00 / 1.15) could not be evaluated,
   because both pods were DEGRADED. The clean wB97M-V cells read 0.47–0.57, far below 1.15.
 - PREREG-5: mixed/stock inside an instance, all 8 cells; mixed MIG gains for r2SCAN and paracetamol
@@ -419,6 +451,7 @@ listed numbers are checked by `verify_native.py`:
 | PREREG-7 RESULT, headline | "both replications hold on their geomeans" | the X3r falsifier fired on a geomean; L12r's could not be run as registered |
 | PREREG-7 RESULT, X3r idle | "higher than any Blackwell pod here" | ST2 idled at 241 W |
 | PREREG-7 RESULT, stock-vs-stock floor | ≤ 2.8e-12 Ha | 3.2e-12 Ha when CC1 is pooled across phases (2.3e-12 within a phase) |
+| PREREG-4 RESULT and its erratum, C4 | "a same-guess comparator was not recorded"; "mixed-specific residual" for ρ > 3; r2SCAN paracetamol's residual "systematic" | the same-guess comparator S was recorded in every sentinel and never read. M−R ≈ S−R in 17 of 18 cells: the residual is stock's convergence-tolerance residual. The precision imprint is M−S, 4e-9 to 2.7e-7 Ha/Bohr (PREREG-4 erratum 2) |
 
 **Procedural lapses:**
 - The RTX 5090's third capacity attempt was not made inside its window.

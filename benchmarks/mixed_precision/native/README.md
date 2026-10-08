@@ -28,7 +28,8 @@ python verify_native.py      # stdlib only; exit 0 = every quoted number reprodu
 **How to read the protocols.**
 - **Predictions** were written before the runs they predict, with bands. A miss is reported as
   MODEL-MISS and not retuned.
-- **Gates** are pass/fail on accuracy and treatment. One pod failed a gate: D1, on one dipole. It
+- **Gates** are pass/fail on accuracy and treatment. One pod failed a gate: D1, on one dipole. That dipole residual is stock's own convergence-tolerance
+  residual (mixed vs same-guess stock differs by 1e-6 D; CLAIMS.md C4). It
   stands as a FAIL.
 - **CONTENDED and DEGRADED pods** are reported separately and never pooled.
   - CONTENDED means another load was on the GPU; DEGRADED means too many NOISY cells.

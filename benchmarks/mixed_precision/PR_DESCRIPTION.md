@@ -41,7 +41,17 @@ B3LYP 1.92× (4 molecules, cuTENSOR on both sides); the port's r2SCAN at the pro
 `conv_tol_grad = 1e-5` reads 1.586.
 
 In every run, the final energy matched stock to ≤ 1e-9 Ha (worst 1.7e-10 Ha), and cycle counts
-matched or differed by one. See
+matched or differed by one.
+
+Downstream properties were compared against stock SCFs run from the same guess with the same
+settings (18 cells: r2SCAN, B3LYP, wB97M-V × 6 molecules):
+- **Nuclear gradients:** within 4e-9 – 2.7e-7 Ha/Bohr.
+- **Dipoles:** within 9.3e-6 D.
+- **The one exception:** in one B3LYP cell the mixed SCF took one extra cycle and landed 3.4×
+  *closer* to a tight reference than stock did.
+- Against that tight reference, both stock and mixed carry the same 1e-6-scale residual. It comes
+  from the default `conv_tol_grad`, not from precision
+  (`benchmarks/mixed_precision/native/CLAIMS.md` C4). See
 `benchmarks/mixed_precision/README.md` for the data and the script that re-derives every
 aggregate.
 
