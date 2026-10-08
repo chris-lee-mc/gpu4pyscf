@@ -149,9 +149,16 @@ two files and touches `numint.py`; it is not in that count.
 - **Scope.** The analytic gradient, the Hessian and UKS are out of scope. Range-separated and NLC
   functionals are out of scope for `xc` / `k`; the VV10 component below is the only path that
   treats an NLC functional.
-- **Base.** The branch is based on v1.8.1. A copy rebased onto current master exists, but has
-  **not** been GPU-validated there. Master's compiled libraries differ from the 1.8.1 wheel, so
-  the overlay method does not apply.
+- **Base.** The measurements were taken on a v1.8.1-based branch. A copy rebased onto current master
+  (`eef5f5b`) was GPU-validated separately, with gpu4pyscf built from source for sm_120 on one RTX
+  PRO 6000:
+  - upstream's `test_df_rks`, `test_df_jk`, `test_rks` and `test_scf` pass 43/43 on master and
+    43/43 with the branch;
+  - the new tests pass 49/49;
+  - the VV10 kernels are bitwise identical to their emulation;
+  - stock vs mixed on the trio gives |ΔE| ≤ 5.9e-12 Ha with identical cycle counts.
+
+  Other architectures and upstream's full suite were not run.
 - **For the maintainers:** whether the default switch thresholds and the `|ΔE| ≤ 1e-8 Ha` test
   tolerance are acceptable, and whether you prefer the policy object or a flag on `density_fit()`.
 
