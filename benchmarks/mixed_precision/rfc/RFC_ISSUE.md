@@ -168,7 +168,8 @@ the same on the branch; the 49 new tests pass; stock vs mixed on three molecules
 - **Cold start**: the first SCF on a fresh Blackwell machine took 64–168 s. That is the CUDA
   driver's JIT cache, which stock pays too (134.0 s when it runs first); it is not the mode's cost.
 - Two geometry-safety options (a DIIS reset at the switch, a warm-start rule) were investigated on
-  the fork and are not proposed: the DIIS reset made the endpoint worse, and the warm-start rule
+  the fork and are not proposed: the DIIS reset did not help (it moved the stopping point to 7.4e-7 – 3.8e-6 Ha/Bohr
+  from stock), and the warm-start rule
   never triggered.
 
 ## Questions for the maintainers

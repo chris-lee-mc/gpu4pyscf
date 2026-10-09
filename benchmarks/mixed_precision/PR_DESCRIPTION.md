@@ -1,6 +1,8 @@
 <!--
 STAGING FILE. This is the intended body of a pull request to pyscf/gpu4pyscf. It has not been
 opened. Delete this file from the branch before opening the PR.
+SUPERSEDED for the master-based PR by rfc/PR_BODY.md (with rfc/RFC_ISSUE.md as the issue). This
+file describes the v1.8.1-based branch; its file table and diff size are that branch's.
 Preferred order: first file the RFC issue asking whether the maintainers want the mode at all,
 then open this PR only if they do, referencing that issue.
 -->
@@ -178,7 +180,7 @@ two files and touches `numint.py`; it is not in that count.
 
 ## VV10 component (`MixedPrecision(vv10=True)`)
 
-**Scope note.** The upstream RFC (`DISCUSSION-DRAFT-precision-option.md`) lists NLC among the
+**Scope note.** The upstream RFC (`rfc/RFC_ISSUE.md`) lists NLC among the
 initial exclusions, so this component is outside what it proposes. It would be proposed separately,
 or as a follow-up once the XC/K mode is settled; it is on this branch so that it can be reviewed
 and validated against the same 1.8.1 base. It is independent of `xc` / `k`: those still refuse
