@@ -204,3 +204,27 @@ quoted from upstream files are numbers too: prefer naming the function instead).
   intended check.
 - P5: under "Limitations", after the FP64-strong bullet, add the M1 result at library defaults,
   whatever it is, with the same PAYS/NEUTRAL/HARMS reading CLAIMS uses.
+
+## Addendum (2026-10-10, owner review): dependency pins in upstream CI
+
+Upstream's `unittest.yml` installs different versions from the ones every validation here used.
+
+| CI job | pyscf | gpu4pyscf-libxc | validated here |
+|---|---|---|---|
+| `single-gpu` (V100) | from `requirements.txt` | **0.9.0** | libxc 0.8.1 |
+| `multi-gpu` (2×T4) | **2.8** (`pip3 install pyscf==2.8`) | 0.8.1 | pyscf 2.14.0 |
+
+**G8, a gap.** The branch has never run against pyscf 2.8 or libxc 0.9.0. Nothing here shows that
+`mixed_precision.py`, `vv10_mixed.py` or the tests use a pyscf API newer than 2.8. The libxc 0.9.0
+change could also shift XC values the |ΔE| ≤ 1e-8 Ha tests compare against stock. Both arms use the
+same libxc, so this is less likely to matter, but it is unmeasured.
+
+Closure, before the PR:
+- **On CPU.** List every `pyscf.*` symbol the four new files import or call, and check each exists
+  in pyscf 2.8. `pip download pyscf==2.8` and grep; no GPU is needed.
+- **On the GPU.** Add a pin option to the g4psrc pod (pyscf, gpu4pyscf-libxc) and run r4 twice:
+  - once at the lock's pins, as r1–r3;
+  - once at the CI pins: libxc 0.9.0 for the V100 job, and pyscf 2.8 for the 2T4 job.
+  That is 1 extra pod. Under 2T4's pins, the multi-GPU skip (G1) is what runs, so pyscf 2.8 only
+  needs the single-GPU import and test path.
+- **If the pins differ** by the time of the PR, use whatever `unittest.yml` says then.
