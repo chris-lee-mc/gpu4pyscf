@@ -3,37 +3,28 @@
 For the person who will post. Nothing in this directory has been posted. The order matters:
 **the issue first, the PR only after the maintainers have answered.**
 
-State of play when this checklist was written (2026-10-09):
+State of play (updated 2026-10-10):
 
 | item | value |
 |---|---|
-| code branch | `chris-lee-mc/gpu4pyscf@mixed-precision-upstream`, head `122e2d5ee2bb20a7d6fa611e07a3628fc4242b01`, four commits on upstream master `82bc70289268193aacfc225aabce6b7221d01632` |
+| code branch | `chris-lee-mc/gpu4pyscf@mixed-precision-upstream`, head `ac4c668eab75362a05d50fb747d37112625fecfe`, four commits on upstream master `c1a6e371d1a46afc9932c618108a4bc70e895edf` |
 | evidence package | `chris-lee-mc/gpu4pyscf@mixed-precision-rfc-package-v2`, `benchmarks/mixed_precision/` |
-| last GPU validation of the code branch | g4psrc r2, engine-repo run `37881608304`, on master `82bc702`, from source for sm_120 |
-| upstream master at the time of writing | `c1a6e37` (2026-10-10): **two commits past the base**, one of which (`a2f3c36`, "Change eval_ao API. Reject argument shls_slice (#955)") edits `gpu4pyscf/dft/numint.py`, a file this branch also edits |
+| last GPU validation of the code branch | g4psrc r3, engine-repo run `38017282503`, on master `c1a6e37`, from source for sm_120: PASS (`validation/VALIDATION-g4psrc.md`) |
+| earlier heads, kept as branches | `mixed-precision-upstream-on-eef5f5b` (r1), `mixed-precision-upstream-on-82bc702` (r2) |
 
 ## 1. Base: re-verify, rebase if needed, re-validate
 
-- [ ] `git fetch upstream && git log --oneline 82bc702..upstream/master`. If the list is non-empty,
-      the base is stale (it already is: see the table).
-- [ ] Rebase `mixed-precision-upstream` onto `upstream/master`. Expect to resolve `dft/numint.py`
-      by hand: the branch's hunks are the `uwe_kernel=` / `vv10_kernel=` keywords in `_vv10nlc`
-      and `nr_nlc_vxc`; `a2f3c36` changed `eval_ao`. `mixed_precision.py` and `vv10_mixed.py` do
-      not call `eval_ao` directly (they use `ni.block_loop`, `numint.eval_rho`, `_eval_rho2`,
-      `_scale_ao`, `_tau_dot`), so check that those private helpers still exist with the same
-      signatures on the new master.
-- [ ] Re-run the g4psrc validation on the rebased head, from source for sm_120, and require the
-      same gates as r2: upstream `test_df_rks`, `test_df_jk`, `test_rks`, `test_scf` identical on
-      master and branch (r2: 44 passed, 1 skipped); new tests 49/49; VV10 kernels bitwise equal to
-      their emulations; trio \|ΔE\| ≤ 1e-8 Ha with cycles ±1 (r2: ≤ 6.8e-12 Ha, identical cycles).
-- [ ] Update the base SHA, the run id and the numbers in `PR_BODY.md` (Test plan) and in
-      `RFC_ISSUE.md` ("Correctness of the master-based branch"), then re-run
-      `python3 benchmarks/mixed_precision/rfc/verify_rfc.py`: the new run id and any changed count
-      must be added to its `ALLOWLIST` with the run as the source, or the checker fails.
-- [ ] Add a validation record for the run the PR cites. The package's `validation/` directory holds
-      only the v1.8.1-overlay runs; `VALIDATION-vv10.md` still ends "Not validated: the
-      master-rebased copy", which `37881608304` has since superseded. Write
-      `validation/VALIDATION-g4psrc.md` (+ the JSON record) and fix that line.
+- [x] Rebased onto `c1a6e37` (no conflicts; the branch adds no `eval_ao` call, so `a2f3c36`'s API
+      change does not touch it) and re-validated as g4psrc r3: regression 44 passed + 1 skipped on
+      both trees, 49/49 new tests, VV10 bitwise identity, trio \|ΔE\| ≤ 6.4e-12 Ha with
+      identical cycles. `PR_BODY.md`, `RFC_ISSUE.md` and `verify_rfc.py` cite r3.
+- [x] `validation/VALIDATION-g4psrc.md` with `g4psrc_r2.json` and `g4psrc_r3.json` added;
+      `VALIDATION-vv10.md`'s "not validated" line now points to it.
+- [ ] Immediately before posting: `git fetch upstream && git log --oneline c1a6e37..upstream/master`.
+      If the list is non-empty, rebase again, re-run g4psrc (the engine repo pins `BASE_SHA` in
+      `.github/scripts/runpod_g4psrc.py`, with a dated section in the port plan before dispatch),
+      update the run id, base and numbers in `PR_BODY.md` and `RFC_ISSUE.md`, add them to
+      `verify_rfc.py`'s `ALLOWLIST`, and re-run it.
 
 ## 2. Lint, exactly as upstream's `.github/workflows/lint.yml` runs it
 
@@ -46,8 +37,8 @@ ruff check --select NPY --ignore NPY002 gpu4pyscf
 flake8 --config .flake8 gpu4pyscf
 ```
 
-- [ ] All three clean on the rebased head. On `122e2d5e` all three passed on the eight changed
-      Python files (ruff 0.15.8, flake8 7.3.0), checked on a scratch export of the tree.
+- [x] All three clean on the whole `gpu4pyscf` tree at `ac4c668e` (ruff 0.15, flake8 7.3.0).
+- [ ] Re-run if the branch changes again.
 
 ## 3. Licence headers and CLA
 
@@ -69,23 +60,16 @@ flake8 --config .flake8 gpu4pyscf
 
 ## 4. Consistency of the staged texts (found while preparing them; fix before posting)
 
-- [ ] `PR_DESCRIPTION.md` is the older draft and is superseded by `rfc/PR_BODY.md`. Delete
-      `PR_DESCRIPTION.md` from the package branch, or keep it clearly marked as superseded. Its
-      stale points: "21 tests" for `test_mixed_precision.py` (it has 31 on `122e2d5e`; 21 + 10
-      AO-cache tests), "+914 / −18" (the v1.8.1 code diff; the master-based diff is +2913 / −39),
-      a reference to `DISCUSSION-DRAFT-precision-option.md`, which is not in the package, and
-      prototype speed numbers that `rfc/` does not quote.
-- [ ] `benchmarks/mixed_precision/README.md` says "41 pods" in its last section;
-      `native/README.md` and `native/SOURCES.md` say 44. Make them agree (SOURCES lists 44 CSVs).
-- [ ] `gpu4pyscf/dft/mixed_precision.py`'s module docstring says "about 1.7-2x slower for wB97M-V"
-      on the H100/A100; `CLAIMS.md` C3 says 1.6–2× (H100 0.577–0.615, A100 clean cells
-      0.488–0.596). Harmless, but align the docstring on the code branch if you touch it.
-- [ ] That docstring also says "K is never FP32 on an iteration where XC is FP64". `begin_call`
-      enforces that only when `xc=True`; a k-only policy runs FP32 K under FP64 XC, and
-      `test_k_only_paracetamol` asserts exactly that. `rfc/` says "with `xc` and `k` both on, K
-      returns to FP64 no later than XC". Align the docstring on the code branch.
+- [x] `PR_DESCRIPTION.md` is marked as superseded by `rfc/PR_BODY.md` (it describes the v1.8.1
+      branch: "21 tests", "+914 / −18"); its dead `DISCUSSION-DRAFT` reference now points to
+      `rfc/RFC_ISSUE.md`. Delete it from the package branch before posting if you prefer.
+- [x] `README.md` now says 44 pods, matching `native/README.md` and `native/SOURCES.md`.
+- [x] The `mixed_precision.py` docstring (amended into the fourth commit, `ac4c668e`) now gives
+      CLAIMS C3's figures (wB97M-V 1.6–2× slower; H100 B3LYP neutral to about 1.1× slower; A100
+      11 of 12 clean cells neutral or slower), and says K is held to XC's switch only when `xc` and
+      `k` are both on.
 - [ ] The usage snippet in that docstring uses `gpu4pyscf.dft.RKS` (a factory function in
-      `gpu4pyscf/dft/__init__.py` on `82bc702`); the tests and `rfc/` use `gpu4pyscf.dft.rks.RKS`.
+      `gpu4pyscf/dft/__init__.py` on `c1a6e37`); the tests and `rfc/` use `gpu4pyscf.dft.rks.RKS`.
       Both resolve; no action unless the rebase changes `dft/__init__.py`.
 
 ## 5. Final verification before posting anything
@@ -120,7 +104,7 @@ flake8 --config .flake8 gpu4pyscf
       the body of `PR_BODY.md`, `#<issue>` filled in, and the HTML comment removed. Upstream has no
       PR template. The code branch contains only the nine files in the reviewer's guide; the
       evidence package stays on the fork's package branch and is linked, not included.
-- [ ] If the maintainers asked for XC + K only, drop the VV10 commit (`a717a11`) and the AO-cache
-      commit (`4b38ec1`) from the PR branch, remove the VV10 section and the AO-cache rows from
+- [ ] If the maintainers asked for XC + K only, drop the VV10 commit (`d1ccbfc`) and the AO-cache
+      commit (`5878ac8`) from the PR branch, remove the VV10 section and the AO-cache rows from
       `PR_BODY.md`, and re-run `verify_rfc.py` (its `BOUND` table will then need the VV10 and
       cache entries removed, which is deliberate: every edit to a number goes through the checker).

@@ -123,26 +123,26 @@ BOUND = {
 # not of the benchmark data. Each with its source. Nothing else is allowed outside CLAIMS.md and
 # the verifier's recomputed values.
 ALLOWLIST = {
-    # gpu4pyscf/dft/mixed_precision.py @ 122e2d5e: MixedPrecision defaults and module constants
+    # gpu4pyscf/dft/mixed_precision.py @ ac4c668e: MixedPrecision defaults and module constants
     "1e-3": "mixed_precision.py: XC_SWITCH_TOL = K_SWITCH_TOL = 1e-3",
     "2": "mixed_precision.py: SWITCH_STALL = 2; also 'two consecutive iterations' (fp64_tail)",
     "30": "mixed_precision.py: SWITCH_CALL_CAP = 30",
     "0.7": "mixed_precision.py: AO_CACHE_MEM_FRACTION = 0.7",
-    # gpu4pyscf/dft/vv10_mixed.py @ 122e2d5e
+    # gpu4pyscf/dft/vv10_mixed.py @ ac4c668e
     "1e-5": "vv10_mixed.py: VV10_SWITCH_TOL = 1e-5",
     "1e-10": "vv10_mixed.py: VVDF_REL = 1e-10 (certificate band, relative)",
     "1e-11": "vv10_mixed.py: VVDF_DENLC = 1e-11 (certificate band, Ha); tests: SAME = 1e-11",
     "48": "vv10_mixed.py / mixed_precision.py docstring: df64 is ~48-bit",
-    # tests @ 122e2d5e
+    # tests @ ac4c668e
     "1e-8": "test_mixed_precision.py: ETOL = 1e-8",
     "31": "test_mixed_precision.py: 31 test methods (21 KnownValues + 10 AOCache)",
     "18": "test_mixed_precision_vv10.py: 18 test methods; also CLAIMS C4 (18 cells)",
-    "49": "31 + 18 new tests; g4psrc r2 49/49",
-    # git diff --numstat 82bc7028 122e2d5e
-    "2913": "git diff --numstat 82bc7028 122e2d5e: total insertions",
-    "39": "git diff --numstat 82bc7028 122e2d5e: total deletions (39 on code, 0 on tests/README)",
-    "2068": "git diff --numstat, gpu4pyscf/ minus tests: insertions",
-    "961": "numstat: dft/mixed_precision.py +961",
+    "49": "31 + 18 new tests; g4psrc r3 49/49",
+    # git diff --numstat c1a6e37 ac4c668e
+    "2915": "git diff --numstat c1a6e37 ac4c668e: total insertions",
+    "39": "git diff --numstat c1a6e37 ac4c668e: total deletions (39 on code, 0 on tests/README)",
+    "2070": "git diff --numstat, gpu4pyscf/ minus tests: insertions",
+    "963": "numstat: dft/mixed_precision.py +963",
     "915": "numstat: dft/vv10_mixed.py +915",
     "77": "numstat: df/df_jk.py +77",
     "3": "numstat: df/df_jk.py -3; CLAIMS: '3 cards', '3 %'",
@@ -153,11 +153,12 @@ ALLOWLIST = {
     "41": "numstat: scf/hf.py +41",
     "12": "numstat: scf/hf.py -12; CLAIMS: '12 readings'",
     "9": "nine files in the diff; CLAIMS: '9 cells'",
-    # g4psrc r2 (engine-repo run 37881608304, master 82bc702, from source for sm_120)
-    "37881608304": "g4psrc r2 run id (engine repo)",
-    "44": "g4psrc r2: upstream regression 44 passed (+ 1 skipped) on both trees; CLAIMS: '20–44 atoms'",
-    "1": "g4psrc r2: 1 skipped; CLAIMS: 'above 1'",
-    "6.8e-12": "g4psrc r2: trio |dE| <= 6.8e-12 Ha",
+    # g4psrc r3 (engine-repo run 38017282503, master c1a6e37, from source for sm_120);
+    # validation/VALIDATION-g4psrc.md and g4psrc_r3.json carry the record
+    "38017282503": "g4psrc r3 run id (engine repo)",
+    "44": "g4psrc r3: upstream regression 44 passed (+ 1 skipped) on both trees; CLAIMS: '20–44 atoms'",
+    "1": "g4psrc r3: 1 skipped; CLAIMS: 'above 1'",
+    "6.4e-12": "g4psrc r3: trio |dE| <= 6.4e-12 Ha",
     # RFC prose
     "6": "six questions; CLAIMS: six molecules",
     "5": "CLAIMS C1: 5 healthy pods",

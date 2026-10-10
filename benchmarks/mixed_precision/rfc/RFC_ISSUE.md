@@ -17,7 +17,7 @@ convergence and stock gradients.
 We have an implementation on a fork and would like to know whether the maintainers want it, and
 in what shape, before opening a PR. The code is
 [`chris-lee-mc/gpu4pyscf@mixed-precision-upstream`](https://github.com/chris-lee-mc/gpu4pyscf/tree/mixed-precision-upstream)
-(four commits on master `82bc702`); the evidence package is
+(four commits on master `c1a6e37`); the evidence package is
 [`chris-lee-mc/gpu4pyscf@mixed-precision-rfc-package-v2`, `benchmarks/mixed_precision/`](https://github.com/chris-lee-mc/gpu4pyscf/tree/mixed-precision-rfc-package-v2/benchmarks/mixed_precision),
 whose `native/verify_native.py` recomputes every number quoted here from the per-run data.
 
@@ -146,7 +146,7 @@ gain because the gradient runs stock.
 **Correctness of the master-based branch** (from source for sm_120, one RTX PRO 6000): upstream
 `test_df_rks`, `test_df_jk`, `test_rks` and `test_scf` give 44 passed and 1 skipped on master and
 the same on the branch; the 49 new tests pass; stock vs mixed on three molecules gives
-\|ΔE\| ≤ 6.8e-12 Ha with identical cycle counts.
+\|ΔE\| ≤ 6.4e-12 Ha with identical cycle counts.
 
 ## What is not claimed
 

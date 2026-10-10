@@ -42,7 +42,8 @@ measurement is in `../data/vv10_wb97mv_pro6000.csv` (2.635× on celecoxib).
 
 **Not validated here:** the master-rebased copy, and any later commit.
 
-**Later (2026-10-09):** the master-rebased branch (`122e2d5e` on upstream master `82bc702`) was
-validated separately, built from source for sm_120 (engine-repo run `37881608304`, g4psrc r2):
+**Later (2026-10-10):** the master-rebased branch (`ac4c668e` on upstream master `c1a6e37`) was
+validated separately, built from source for sm_120 (engine-repo run `38017282503`, g4psrc r3; see
+`VALIDATION-g4psrc.md`):
 the VV10 launchers are bitwise identical to the emulation, and the three wB97M-V trio cells pass
 with the VV10 certificate in band. See `../rfc/PR_BODY.md`.

@@ -28,12 +28,12 @@ not detect that device class; see Limitations.
 
 ## Reviewer's guide
 
-Read in this order. Diff: +2913 / −39 over nine files, of which +2068 / −39 is code outside the
+Read in this order. Diff: +2915 / −39 over nine files, of which +2070 / −39 is code outside the
 tests and README.
 
 | order | file | what it does |
 |---|---|---|
-| 1 | `gpu4pyscf/dft/mixed_precision.py` (new, +961) | `MixedPrecision` policy; `PhaseController` (one-way switch on an energy trace); `check_supported` (every refusal); `_SCFState` (per-iteration protocol `begin_call` / `end_call`, the clean-streak that defines the FP64 tail, `k_scope`, the record); `begin` / `end` (lifecycle, VV10 certificate); the AO cache (`_build_ao_cache`, tiers decided from predicted size); `nr_rks_fp32` (FP32 rho/vxc, FP64 promotion per block) and `nr_rks_fp64_cached` (the statements of `numint.nr_rks` / `_nr_rks_task` on cached FP64 blocks, bitwise stock) |
+| 1 | `gpu4pyscf/dft/mixed_precision.py` (new, +963) | `MixedPrecision` policy; `PhaseController` (one-way switch on an energy trace); `check_supported` (every refusal); `_SCFState` (per-iteration protocol `begin_call` / `end_call`, the clean-streak that defines the FP64 tail, `k_scope`, the record); `begin` / `end` (lifecycle, VV10 certificate); the AO cache (`_build_ao_cache`, tiers decided from predicted size); `nr_rks_fp32` (FP32 rho/vxc, FP64 promotion per block) and `nr_rks_fp64_cached` (the statements of `numint.nr_rks` / `_nr_rks_task` on cached FP64 blocks, bitwise stock) |
 | 2 | `gpu4pyscf/scf/hf.py` (+41 / −12) | `scf()` opens the state (`mixed_precision.begin`) before `_kernel` and closes it after (`end`, which certifies VV10; `end(failed=True)` on an exception). `_kernel`: when the convergence tests are met without an FP64 tail, forces the switch and continues; raises if no `get_veff` ever reported to the policy (an unsupported `get_veff` override) |
 | 3 | `gpu4pyscf/df/df_jk.py` (+77 / −3) | `_DFHF.get_veff` (RHF branch): `begin_call`, FP32 or cached-FP64 XC, `k_scope` around `get_jk`, `vv10_kernel=` to `nr_nlc_vxc`, `end_call`. `get_jk`: the FP32 K path (`_k_block_fp32`: FP32 half-transform in the FP64 `rhok` buffer, `cderi` cast in aux-index chunks, FP64 accumulator), taken only when `dfobj._k_precision == 'fp32'` for the plain `omega=0`, mode-0 case |
 | 4 | `gpu4pyscf/dft/rks.py` (+45 / −4) | `get_veff` (non-DF): the same protocol; on the first FP64 K iteration after FP32 K it drops `vj_last` so J is rebuilt from the full density (a guard: FP32 K is refused without DF). `KohnShamDFT`: `mixed_precision = None` class attribute and two `_keys` entries |
@@ -116,13 +116,13 @@ cuTENSOR 2.3.1, def2-mTZVPP / def2-tzvpp-jkfit, `conv_tol=1e-9`, default `conv_t
   stock for LDA/GGA/meta-GGA, tiers, invalidation, empty-block refusal, opt-in default); the VV10
   kernels per point against stock `_vv10nlc`, the df64 tail, the certificate (including a
   perturbed result that must fail it), an SCF that raises, and the all-off policy.
-- **GPU validation of this branch on master `82bc702`** (`g4psrc r2`, engine-repo run
-  `37881608304`; gpu4pyscf built from source for sm_120 on one RTX PRO 6000 Blackwell):
+- **GPU validation of this branch on master `c1a6e37`** (`g4psrc r3`, engine-repo run
+  `38017282503`; gpu4pyscf built from source for sm_120 on one RTX PRO 6000 Blackwell):
   - upstream `df/tests/test_df_rks.py`, `df/tests/test_df_jk.py`, `dft/tests/test_rks.py`,
     `scf/tests/test_scf.py`: **44 passed, 1 skipped on master, and the same on this branch**;
   - the new tests: **49/49**;
   - the VV10 kernels bitwise identical on the GPU to their NumPy emulations;
-  - stock vs mixed on paracetamol, propranolol and celecoxib: **\|ΔE\| ≤ 6.8e-12 Ha with identical
+  - stock vs mixed on paracetamol, propranolol and celecoxib: **\|ΔE\| ≤ 6.4e-12 Ha with identical
     cycle counts** and an FP64 tail in every run.
 - Earlier validations of the same code overlaid on the v1.8.1 wheel (`benchmarks/mixed_precision/validation/`)
   passed the same gates. Other architectures and upstream's full suite were not run.

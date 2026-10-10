@@ -1,0 +1,1108 @@
+{
+ "run_id": "37881608304-1-30841974",
+ "status": "PASS",
+ "fork": "chris-lee-mc/gpu4pyscf",
+ "sha": "122e2d5ee2bb20a7d6fa611e07a3628fc4242b01",
+ "base_sha": "82bc70289268193aacfc225aabce6b7221d01632",
+ "cuda_arch": "120-real",
+ "problems": [],
+ "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 12.0",
+ "pytest_version": "pytest 9.1.1",
+ "nvcc": [
+  "Build cuda_12.8.r12.8/compiler.35583870_0"
+ ],
+ "git": {
+  "head": "122e2d5ee2bb20a7d6fa611e07a3628fc4242b01",
+  "base": "82bc70289268193aacfc225aabce6b7221d01632",
+  "base_is_ancestor": true,
+  "rc": [
+   0,
+   0,
+   0
+  ]
+ },
+ "changed": [
+  [
+   "M",
+   "README.md"
+  ],
+  [
+   "M",
+   "gpu4pyscf/df/df_jk.py"
+  ],
+  [
+   "A",
+   "gpu4pyscf/dft/mixed_precision.py"
+  ],
+  [
+   "M",
+   "gpu4pyscf/dft/numint.py"
+  ],
+  [
+   "M",
+   "gpu4pyscf/dft/rks.py"
+  ],
+  [
+   "A",
+   "gpu4pyscf/dft/tests/test_mixed_precision.py"
+  ],
+  [
+   "A",
+   "gpu4pyscf/dft/tests/test_mixed_precision_vv10.py"
+  ],
+  [
+   "A",
+   "gpu4pyscf/dft/vv10_mixed.py"
+  ],
+  [
+   "M",
+   "gpu4pyscf/scf/hf.py"
+  ]
+ ],
+ "build_tools_missing": [],
+ "build": {
+  "configure_rc": 0,
+  "build_rc": 0,
+  "jobs": 64,
+  "wall_s": 132.9,
+  "libs": [
+   "gpu4pyscf/lib/libcupy_helper.so",
+   "gpu4pyscf/lib/libgdft.so",
+   "gpu4pyscf/lib/libgecp.so",
+   "gpu4pyscf/lib/libgint.so",
+   "gpu4pyscf/lib/libgvhf.so",
+   "gpu4pyscf/lib/libgvhf_md.so",
+   "gpu4pyscf/lib/libgvhf_rys.so",
+   "gpu4pyscf/lib/libmgrid_v2.so",
+   "gpu4pyscf/lib/libmgrid_v3.so",
+   "gpu4pyscf/lib/libpbc.so",
+   "gpu4pyscf/lib/libsem.so",
+   "gpu4pyscf/lib/libsolvent.so"
+  ]
+ },
+ "wheel_removed": {
+  "rc": 0,
+  "after": "NONE",
+  "raw": "G4PSRC_WHEEL after NONE"
+ },
+ "smoke": {
+  "base": {
+   "rc": 0,
+   "libxc": "/usr/local/lib/python3.10/dist-packages/gpu4pyscf/lib/deps/lib/libxc.so",
+   "package": "/tmp/g4psrc/base/gpu4pyscf/__init__.py",
+   "cupy_helper": "/tmp/g4psrc/base/gpu4pyscf/lib/libcupy_helper.so",
+   "contract_engine": "cupy",
+   "tail": [
+    "G4PSRC_SMOKE contract_engine cupy",
+    "/tmp/g4psrc/base/gpu4pyscf/lib/cutensor.py:154: UserWarning: using cupy as the tensor contraction engine.",
+    "  warnings.warn(f'using {contract_engine} as the tensor contraction engine.')"
+   ]
+  },
+  "branch": {
+   "rc": 0,
+   "libxc": "/usr/local/lib/python3.10/dist-packages/gpu4pyscf/lib/deps/lib/libxc.so",
+   "package": "/tmp/g4psrc/fork/gpu4pyscf/__init__.py",
+   "cupy_helper": "/tmp/g4psrc/fork/gpu4pyscf/lib/libcupy_helper.so",
+   "contract_engine": "cupy",
+   "tail": [
+    "G4PSRC_SMOKE contract_engine cupy",
+    "/tmp/g4psrc/fork/gpu4pyscf/lib/cutensor.py:154: UserWarning: using cupy as the tensor contraction engine.",
+    "  warnings.warn(f'using {contract_engine} as the tensor contraction engine.')"
+   ]
+  }
+ },
+ "pytest": {
+  "regression_base": {
+   "rc": 0,
+   "wall_s": 157.7,
+   "counts": {
+    "passed": 44,
+    "failed": 0,
+    "skipped": 1
+   },
+   "imported_from": "/tmp/g4psrc/base/gpu4pyscf/__init__.py",
+   "failed": {},
+   "tail": [
+    "",
+    "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+    "44 passed, 1 skipped, 1 warning in 156.81s (0:02:36)"
+   ]
+  },
+  "regression_branch": {
+   "rc": 0,
+   "wall_s": 152.5,
+   "counts": {
+    "passed": 44,
+    "failed": 0,
+    "skipped": 1
+   },
+   "imported_from": "/tmp/g4psrc/fork/gpu4pyscf/__init__.py",
+   "failed": {},
+   "tail": [
+    "",
+    "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+    "44 passed, 1 skipped, 1 warning in 151.66s (0:02:31)"
+   ]
+  },
+  "new_tests": {
+   "rc": 0,
+   "wall_s": 121.6,
+   "counts": {
+    "passed": 49,
+    "failed": 0,
+    "skipped": 0
+   },
+   "imported_from": "/tmp/g4psrc/fork/gpu4pyscf/__init__.py",
+   "failed": {},
+   "tail": [
+    "",
+    "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+    "49 passed, 1 warning in 120.78s (0:02:00)"
+   ]
+  }
+ },
+ "regressions": [],
+ "identity": {
+  "problems": [],
+  "files": {
+   "vv10_mixed": "/tmp/g4psrc/fork/gpu4pyscf/dft/vv10_mixed.py",
+   "specvv10": "/tmp/r/src/scf_specialized/specvv10.py"
+  },
+  "consts": {
+   "VV10_KERNEL_SRC": true,
+   "VV10_DF64_KERNEL_SRC": true,
+   "FP32_VARIANT": true,
+   "DF64_VARIANT": true,
+   "VV10_SWITCH_TOL": true,
+   "VVDF_REL": true,
+   "VVDF_DENLC": true,
+   "NVRTC_OPTIONS": true
+  },
+  "kernel": {
+   "fp32": {
+    "variant": "f32_t1_hilo",
+    "entry": "vv10_uwe_f32_f32_t1_hilo",
+    "status": "built"
+   },
+   "df64": {
+    "variant": "df64_f32_t1",
+    "entry": "vv10_uwe_df64_f32_t1",
+    "status": "built"
+   }
+  },
+  "bitwise": {
+   "probe_df64/f32": "identical (9 points)",
+   "probe_df64/df64": "identical (9 points)",
+   "shell/f32": "identical (2000 points)",
+   "shell/df64": "identical (2000 points)"
+  },
+  "wall_s": 3.2
+ },
+ "trio": {
+  "cells": [
+   {
+    "mol": "paracetamol",
+    "xc": "r2scan",
+    "e_stock": -515.3814799378862,
+    "e_mixed": -515.3814799378855,
+    "abs_de": 6.821210263296962e-13,
+    "cycles_stock": 13,
+    "cycles_mixed": 13,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 9,
+    "n_k_fp32": 0,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": null,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 3.13 GiB, tier fp64+fp32",
+    "xc_switch": "|dE_xc|=8.789e-04 < 0.001",
+    "ao_cache_tier": "fp64+fp32",
+    "xc_path": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 5,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 2242936832,
+    "ao_cache_bytes32": 1121468416,
+    "ao_cache_mirror_released_call": 10,
+    "xc_switch_call": 10,
+    "cderi_prebuilt": false,
+    "k_switch": "K mixed precision not requested or not a hybrid",
+    "wall_stock_s": 4.487,
+    "wall_mixed_s": 2.413
+   },
+   {
+    "mol": "paracetamol",
+    "xc": "b3lyp",
+    "e_stock": -515.6676423604475,
+    "e_mixed": -515.6676423604475,
+    "abs_de": 0.0,
+    "cycles_stock": 12,
+    "cycles_mixed": 12,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 10,
+    "n_k_fp32": 8,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": 9,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 3.13 GiB, tier fp64+fp32",
+    "xc_switch": "|dE_xc|=2.529e-04 < 0.0003",
+    "ao_cache_tier": "fp64+fp32",
+    "xc_path": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 3,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 2242936832,
+    "ao_cache_bytes32": 1121468416,
+    "ao_cache_mirror_released_call": 11,
+    "xc_switch_call": 11,
+    "cderi_prebuilt": true,
+    "k_switch": "|dE_xc|=8.248e-04 < 0.001",
+    "wall_stock_s": 1.95,
+    "wall_mixed_s": 0.965
+   },
+   {
+    "mol": "paracetamol",
+    "xc": "wb97m-v",
+    "e_stock": -515.4755007112861,
+    "e_mixed": -515.4755007112859,
+    "abs_de": 2.2737367544323206e-13,
+    "cycles_stock": 12,
+    "cycles_mixed": 12,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 0,
+    "n_k_fp32": 0,
+    "xc_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": null,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 2.09 GiB, tier fp64",
+    "xc_switch": "XC mixed precision not requested",
+    "ao_cache_tier": "fp64",
+    "xc_path": [
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 13,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 2242936832,
+    "ao_cache_bytes32": 0,
+    "ao_cache_mirror_released_call": null,
+    "xc_switch_call": 0,
+    "cderi_prebuilt": true,
+    "k_switch": "K mixed precision not requested or not a hybrid",
+    "wall_stock_s": 20.512,
+    "wall_mixed_s": 8.404,
+    "vv10_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "df64",
+     "df64",
+     "df64",
+     "df64",
+     "df64",
+     "df64"
+    ],
+    "vv10_n_fp32": 7,
+    "vv10_n_df64": 6,
+    "vv10_n_masked": [
+     213680,
+     213895,
+     214064,
+     213956,
+     213943,
+     213941,
+     213945,
+     213944,
+     213944,
+     213944,
+     213944,
+     213944,
+     213944
+    ],
+    "vv10_switch_call": 8,
+    "vv10_switch_reason": "|dE_nlc|=4.328e-06 < 1e-05",
+    "vv10_kernel": {
+     "fp32": {
+      "variant": "f32_t1_hilo",
+      "entry": "vv10_uwe_f32_f32_t1_hilo",
+      "status": "built"
+     },
+     "df64": {
+      "variant": "df64_f32_t1",
+      "entry": "vv10_uwe_df64_f32_t1",
+      "status": "built"
+     }
+    },
+    "vv10_cert": {
+     "call": 13,
+     "rel": {
+      "E": 6.370593118355817e-14,
+      "U": 6.77086126780833e-14,
+      "W": 6.249925798241079e-14
+     },
+     "denlc": 2.0101513402980323e-15,
+     "band_rel": 1e-10,
+     "band_denlc": 1e-11,
+     "ok": true,
+     "wall_s": 1.1724385786801577,
+     "error": null
+    },
+    "vv10_cert_wall_share": 0.1395,
+    "tail_precision": {
+     "xc": "fp64",
+     "k": "fp64",
+     "vv10": "df64"
+    }
+   },
+   {
+    "mol": "propranolol",
+    "xc": "r2scan",
+    "e_stock": -827.3346047559612,
+    "e_mixed": -827.3346047559598,
+    "abs_de": 1.3642420526593924e-12,
+    "cycles_stock": 13,
+    "cycles_mixed": 13,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 8,
+    "n_k_fp32": 0,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": null,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 8.08 GiB, tier fp64+fp32",
+    "xc_switch": "|dE_xc|=6.571e-04 < 0.001",
+    "ao_cache_tier": "fp64+fp32",
+    "xc_path": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 6,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 5784076288,
+    "ao_cache_bytes32": 2892038144,
+    "ao_cache_mirror_released_call": 9,
+    "xc_switch_call": 9,
+    "cderi_prebuilt": false,
+    "k_switch": "K mixed precision not requested or not a hybrid",
+    "wall_stock_s": 10.836,
+    "wall_mixed_s": 6.243
+   },
+   {
+    "mol": "propranolol",
+    "xc": "b3lyp",
+    "e_stock": -827.8170690321263,
+    "e_mixed": -827.8170690321244,
+    "abs_de": 1.8189894035458565e-12,
+    "cycles_stock": 12,
+    "cycles_mixed": 12,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 9,
+    "n_k_fp32": 8,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": 9,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 8.08 GiB, tier fp64+fp32",
+    "xc_switch": "|dE_xc|=2.883e-04 < 0.0003",
+    "ao_cache_tier": "fp64+fp32",
+    "xc_path": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 4,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 5784076288,
+    "ao_cache_bytes32": 2892038144,
+    "ao_cache_mirror_released_call": 10,
+    "xc_switch_call": 10,
+    "cderi_prebuilt": true,
+    "k_switch": "|dE_xc|=4.686e-04 < 0.001",
+    "wall_stock_s": 6.276,
+    "wall_mixed_s": 3.337
+   },
+   {
+    "mol": "propranolol",
+    "xc": "wb97m-v",
+    "e_stock": -827.4681502314984,
+    "e_mixed": -827.4681502314984,
+    "abs_de": 0.0,
+    "cycles_stock": 12,
+    "cycles_mixed": 12,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 0,
+    "n_k_fp32": 0,
+    "xc_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": null,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 5.39 GiB, tier fp64",
+    "xc_switch": "XC mixed precision not requested",
+    "ao_cache_tier": "fp64",
+    "xc_path": [
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 13,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 5784076288,
+    "ao_cache_bytes32": 0,
+    "ao_cache_mirror_released_call": null,
+    "xc_switch_call": 0,
+    "cderi_prebuilt": true,
+    "k_switch": "K mixed precision not requested or not a hybrid",
+    "wall_stock_s": 72.899,
+    "wall_mixed_s": 27.337,
+    "vv10_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "df64",
+     "df64",
+     "df64",
+     "df64",
+     "df64",
+     "df64"
+    ],
+    "vv10_n_fp32": 7,
+    "vv10_n_df64": 6,
+    "vv10_n_masked": [
+     408855,
+     409453,
+     409559,
+     409490,
+     409480,
+     409486,
+     409487,
+     409487,
+     409487,
+     409487,
+     409487,
+     409487,
+     409487
+    ],
+    "vv10_switch_call": 8,
+    "vv10_switch_reason": "|dE_nlc|=1.398e-06 < 1e-05",
+    "vv10_kernel": {
+     "fp32": {
+      "variant": "f32_t1_hilo",
+      "entry": "vv10_uwe_f32_f32_t1_hilo",
+      "status": "built"
+     },
+     "df64": {
+      "variant": "df64_f32_t1",
+      "entry": "vv10_uwe_df64_f32_t1",
+      "status": "built"
+     }
+    },
+    "vv10_cert": {
+     "call": 13,
+     "rel": {
+      "E": 1.6747159556705461e-13,
+      "U": 1.4703381972349888e-13,
+      "W": 9.018454929109072e-14
+     },
+     "denlc": 1.0620625482025445e-14,
+     "band_rel": 1e-10,
+     "band_denlc": 1e-11,
+     "ok": true,
+     "wall_s": 4.472891483455896,
+     "error": null
+    },
+    "vv10_cert_wall_share": 0.1636,
+    "tail_precision": {
+     "xc": "fp64",
+     "k": "fp64",
+     "vv10": "df64"
+    }
+   },
+   {
+    "mol": "celecoxib",
+    "xc": "r2scan",
+    "e_stock": -1668.3950499430111,
+    "e_mixed": -1668.3950499430102,
+    "abs_de": 9.094947017729282e-13,
+    "cycles_stock": 14,
+    "cycles_mixed": 14,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 9,
+    "n_k_fp32": 0,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": null,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 10.28 GiB, tier fp64+fp32",
+    "xc_switch": "|dE_xc|=1.671e-04 < 0.001",
+    "ao_cache_tier": "fp64+fp32",
+    "xc_path": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 6,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 7358906368,
+    "ao_cache_bytes32": 3679453184,
+    "ao_cache_mirror_released_call": 10,
+    "xc_switch_call": 10,
+    "cderi_prebuilt": false,
+    "k_switch": "K mixed precision not requested or not a hybrid",
+    "wall_stock_s": 15.113,
+    "wall_mixed_s": 8.358
+   },
+   {
+    "mol": "celecoxib",
+    "xc": "b3lyp",
+    "e_stock": -1669.0626236851217,
+    "e_mixed": -1669.0626236851149,
+    "abs_de": 6.821210263296962e-12,
+    "cycles_stock": 13,
+    "cycles_mixed": 13,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 11,
+    "n_k_fp32": 8,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": 9,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 10.28 GiB, tier fp64+fp32",
+    "xc_switch": "|dE_xc|=7.789e-06 < 0.0003",
+    "ao_cache_tier": "fp64+fp32",
+    "xc_path": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 3,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 7358906368,
+    "ao_cache_bytes32": 3679453184,
+    "ao_cache_mirror_released_call": 12,
+    "xc_switch_call": 12,
+    "cderi_prebuilt": true,
+    "k_switch": "|dE_xc|=7.360e-04 < 0.001",
+    "wall_stock_s": 12.253,
+    "wall_mixed_s": 6.307
+   },
+   {
+    "mol": "celecoxib",
+    "xc": "wb97m-v",
+    "e_stock": -1668.649608403021,
+    "e_mixed": -1668.649608403019,
+    "abs_de": 1.8189894035458565e-12,
+    "cycles_stock": 13,
+    "cycles_mixed": 13,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 0,
+    "n_k_fp32": 0,
+    "xc_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": null,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 6.85 GiB, tier fp64",
+    "xc_switch": "XC mixed precision not requested",
+    "ao_cache_tier": "fp64",
+    "xc_path": [
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 14,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 7358906368,
+    "ao_cache_bytes32": 0,
+    "ao_cache_mirror_released_call": null,
+    "xc_switch_call": 0,
+    "cderi_prebuilt": true,
+    "k_switch": "K mixed precision not requested or not a hybrid",
+    "wall_stock_s": 96.92,
+    "wall_mixed_s": 41.277,
+    "vv10_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "df64",
+     "df64",
+     "df64",
+     "df64",
+     "df64",
+     "df64",
+     "df64"
+    ],
+    "vv10_n_fp32": 7,
+    "vv10_n_df64": 7,
+    "vv10_n_masked": [
+     440424,
+     440606,
+     440706,
+     440616,
+     440617,
+     440625,
+     440627,
+     440625,
+     440624,
+     440624,
+     440624,
+     440624,
+     440624,
+     440624
+    ],
+    "vv10_switch_call": 8,
+    "vv10_switch_reason": "|dE_nlc|=6.563e-06 < 1e-05",
+    "vv10_kernel": {
+     "fp32": {
+      "variant": "f32_t1_hilo",
+      "entry": "vv10_uwe_f32_f32_t1_hilo",
+      "status": "built"
+     },
+     "df64": {
+      "variant": "df64_f32_t1",
+      "entry": "vv10_uwe_df64_f32_t1",
+      "status": "built"
+     }
+    },
+    "vv10_cert": {
+     "call": 14,
+     "rel": {
+      "E": 1.3913131192172748e-13,
+      "U": 1.8769408176064424e-13,
+      "W": 1.223756429578712e-13
+     },
+     "denlc": 1.2243065874012301e-14,
+     "band_rel": 1e-10,
+     "band_denlc": 1e-11,
+     "ok": true,
+     "wall_s": 5.075973283499479,
+     "error": null
+    },
+    "vv10_cert_wall_share": 0.123,
+    "tail_precision": {
+     "xc": "fp64",
+     "k": "fp64",
+     "vv10": "df64"
+    }
+   }
+  ],
+  "problems": []
+ }
+}

@@ -165,13 +165,13 @@ two files and touches `numint.py`; it is not in that count.
   functionals are out of scope for `xc` / `k`; the VV10 component below is the only path that
   treats an NLC functional.
 - **Base.** The measurements were taken on a v1.8.1-based branch. A copy rebased onto current master
-  (`82bc702`, 2026-10-09) was GPU-validated separately, with gpu4pyscf built from source for sm_120
+  (`c1a6e37`, 2026-10-10) was GPU-validated separately, with gpu4pyscf built from source for sm_120
   on one RTX PRO 6000:
   - upstream's `test_df_rks`, `test_df_jk`, `test_rks` and `test_scf` give 44 passed and 1 skipped
     on master, and the same with the branch;
   - the new tests pass 49/49;
   - the VV10 kernels are bitwise identical to their emulation;
-  - stock vs mixed on the trio gives |ΔE| ≤ 6.8e-12 Ha with identical cycle counts.
+  - stock vs mixed on the trio gives |ΔE| ≤ 6.4e-12 Ha with identical cycle counts.
 
   An earlier rebase onto `eef5f5b` passed the same gates (43/43, |ΔE| ≤ 5.9e-12 Ha).
   Other architectures and upstream's full suite were not run.
