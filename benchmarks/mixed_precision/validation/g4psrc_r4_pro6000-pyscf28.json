@@ -1,0 +1,1166 @@
+{
+ "run_id": "38023769024-1-f3c8d125",
+ "status": "PASS",
+ "fork": "chris-lee-mc/gpu4pyscf",
+ "sha": "4d2f3de4c244a6f11debbf44e17d61900c845fc6",
+ "base_sha": "c1a6e371d1a46afc9932c618108a4bc70e895edf",
+ "cuda_arch": "120-real",
+ "profile": "pro6000-pyscf28",
+ "problems": [],
+ "gate_set": [
+  "G1",
+  "G2",
+  "G3",
+  "G4",
+  "G5",
+  "G6",
+  "G7",
+  "G8"
+ ],
+ "gates_skipped_by_profile": [],
+ "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 12.0",
+ "pytest_version": "pytest 9.1.1",
+ "nvcc": [
+  "Build cuda_12.8.r12.8/compiler.35583870_0"
+ ],
+ "git": {
+  "head": "4d2f3de4c244a6f11debbf44e17d61900c845fc6",
+  "base": "c1a6e371d1a46afc9932c618108a4bc70e895edf",
+  "base_is_ancestor": true,
+  "rc": [
+   0,
+   0,
+   0
+  ]
+ },
+ "changed": [
+  [
+   "M",
+   "README.md"
+  ],
+  [
+   "M",
+   "gpu4pyscf/df/df_jk.py"
+  ],
+  [
+   "A",
+   "gpu4pyscf/dft/mixed_precision.py"
+  ],
+  [
+   "M",
+   "gpu4pyscf/dft/numint.py"
+  ],
+  [
+   "M",
+   "gpu4pyscf/dft/rks.py"
+  ],
+  [
+   "A",
+   "gpu4pyscf/dft/tests/test_mixed_precision.py"
+  ],
+  [
+   "A",
+   "gpu4pyscf/dft/tests/test_mixed_precision_vv10.py"
+  ],
+  [
+   "A",
+   "gpu4pyscf/dft/vv10_mixed.py"
+  ],
+  [
+   "M",
+   "gpu4pyscf/scf/hf.py"
+  ]
+ ],
+ "base_requirements": {
+  "sha256": "d2bbc7653cee1b15e12be4bb8adb282dd02de7ba08dc7701e4d97a771a24a6a1",
+  "pins": {
+   "cutensor-cu12": "2.2.0",
+   "gpu4pyscf-libxc-cuda12x": "0.8.1",
+   "cupy-cuda12x": "13.4.1",
+   "pyscf": "2.14.0",
+   "basis-set-exchange": "0.11",
+   "pyscf-dispersion": "1.5.0",
+   "geometric": "1.1.0"
+  }
+ },
+ "profile_install": [
+  {
+   "args": [
+    "-r",
+    "/tmp/g4psrc/base-requirements.txt"
+   ],
+   "rc": 0,
+   "tail": [
+    "WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning."
+   ]
+  },
+  {
+   "args": [
+    "pyscf==2.8",
+    "gpu4pyscf-libxc-cuda12x==0.8.1"
+   ],
+   "rc": 0,
+   "tail": [
+    "WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning."
+   ]
+  }
+ ],
+ "versions_expected": {
+  "pyscf": "2.8",
+  "gpu4pyscf-libxc-cuda12x": "0.8.1"
+ },
+ "versions": {
+  "pyscf": "2.8.0",
+  "cupy-cuda12x": "13.4.1",
+  "scipy": "1.15.3",
+  "gpu4pyscf-libxc-cuda12x": "0.8.1",
+  "cutensor-cu12": "2.2.0",
+  "numpy": "2.2.6"
+ },
+ "build_tools_missing": [],
+ "build": {
+  "configure_rc": 0,
+  "build_rc": 0,
+  "jobs": 96,
+  "wall_s": 138.3,
+  "libs": [
+   "gpu4pyscf/lib/libcupy_helper.so",
+   "gpu4pyscf/lib/libgdft.so",
+   "gpu4pyscf/lib/libgecp.so",
+   "gpu4pyscf/lib/libgint.so",
+   "gpu4pyscf/lib/libgvhf.so",
+   "gpu4pyscf/lib/libgvhf_md.so",
+   "gpu4pyscf/lib/libgvhf_rys.so",
+   "gpu4pyscf/lib/libmgrid_v2.so",
+   "gpu4pyscf/lib/libmgrid_v3.so",
+   "gpu4pyscf/lib/libpbc.so",
+   "gpu4pyscf/lib/libsem.so",
+   "gpu4pyscf/lib/libsolvent.so"
+  ]
+ },
+ "wheel_removed": {
+  "rc": 0,
+  "after": "NONE",
+  "raw": "G4PSRC_WHEEL after NONE"
+ },
+ "smoke": {
+  "base": {
+   "rc": 0,
+   "libxc": "/usr/local/lib/python3.10/dist-packages/gpu4pyscf/lib/deps/lib/libxc.so",
+   "package": "/tmp/g4psrc/base/gpu4pyscf/__init__.py",
+   "cupy_helper": "/tmp/g4psrc/base/gpu4pyscf/lib/libcupy_helper.so",
+   "contract_engine": "None",
+   "tail": [
+    "G4PSRC_SMOKE package /tmp/g4psrc/base/gpu4pyscf/__init__.py",
+    "G4PSRC_SMOKE cupy_helper /tmp/g4psrc/base/gpu4pyscf/lib/libcupy_helper.so",
+    "G4PSRC_SMOKE contract_engine None"
+   ]
+  },
+  "branch": {
+   "rc": 0,
+   "libxc": "/usr/local/lib/python3.10/dist-packages/gpu4pyscf/lib/deps/lib/libxc.so",
+   "package": "/tmp/g4psrc/fork/gpu4pyscf/__init__.py",
+   "cupy_helper": "/tmp/g4psrc/fork/gpu4pyscf/lib/libcupy_helper.so",
+   "contract_engine": "None",
+   "tail": [
+    "G4PSRC_SMOKE package /tmp/g4psrc/fork/gpu4pyscf/__init__.py",
+    "G4PSRC_SMOKE cupy_helper /tmp/g4psrc/fork/gpu4pyscf/lib/libcupy_helper.so",
+    "G4PSRC_SMOKE contract_engine None"
+   ]
+  }
+ },
+ "pytest": {
+  "regression_base": {
+   "rc": 0,
+   "wall_s": 175.1,
+   "counts": {
+    "passed": 44,
+    "failed": 0,
+    "skipped": 1
+   },
+   "imported_from": "/tmp/g4psrc/base/gpu4pyscf/__init__.py",
+   "failed": {},
+   "tail": [
+    "",
+    "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+    "44 passed, 1 skipped, 1 warning in 174.01s (0:02:54)"
+   ]
+  },
+  "regression_branch": {
+   "rc": 0,
+   "wall_s": 164.0,
+   "counts": {
+    "passed": 44,
+    "failed": 0,
+    "skipped": 1
+   },
+   "imported_from": "/tmp/g4psrc/fork/gpu4pyscf/__init__.py",
+   "failed": {},
+   "tail": [
+    "",
+    "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+    "44 passed, 1 skipped, 1 warning in 162.91s (0:02:42)"
+   ]
+  },
+  "new_tests": {
+   "rc": 0,
+   "wall_s": 116.6,
+   "counts": {
+    "passed": 50,
+    "failed": 0,
+    "skipped": 0
+   },
+   "imported_from": "/tmp/g4psrc/fork/gpu4pyscf/__init__.py",
+   "failed": {},
+   "tail": [
+    "",
+    "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+    "50 passed, 1 warning in 115.51s (0:01:55)"
+   ]
+  }
+ },
+ "regressions": [],
+ "identity": {
+  "problems": [],
+  "files": {
+   "vv10_mixed": "/tmp/g4psrc/fork/gpu4pyscf/dft/vv10_mixed.py",
+   "specvv10": "/tmp/r/src/scf_specialized/specvv10.py"
+  },
+  "consts": {
+   "VV10_KERNEL_SRC": true,
+   "VV10_DF64_KERNEL_SRC": true,
+   "FP32_VARIANT": true,
+   "DF64_VARIANT": true,
+   "VV10_SWITCH_TOL": true,
+   "VVDF_REL": true,
+   "VVDF_DENLC": true,
+   "NVRTC_OPTIONS": true
+  },
+  "kernel": {
+   "fp32": {
+    "variant": "f32_t1_hilo",
+    "entry": "vv10_uwe_f32_f32_t1_hilo",
+    "status": "built"
+   },
+   "df64": {
+    "variant": "df64_f32_t1",
+    "entry": "vv10_uwe_df64_f32_t1",
+    "status": "built"
+   }
+  },
+  "bitwise": {
+   "probe_df64/f32": "identical (9 points)",
+   "probe_df64/df64": "identical (9 points)",
+   "shell/f32": "identical (2000 points)",
+   "shell/df64": "identical (2000 points)"
+  },
+  "wall_s": 5.8
+ },
+ "trio": {
+  "cells": [
+   {
+    "mol": "paracetamol",
+    "xc": "r2scan",
+    "e_stock": -515.3814799378864,
+    "e_mixed": -515.3814799378855,
+    "abs_de": 9.094947017729282e-13,
+    "cycles_stock": 13,
+    "cycles_mixed": 13,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 9,
+    "n_k_fp32": 0,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": null,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 3.13 GiB, tier fp64+fp32",
+    "xc_switch": "|dE_xc|=8.783e-04 < 0.001",
+    "ao_cache_tier": "fp64+fp32",
+    "xc_path": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 5,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 2242936832,
+    "ao_cache_bytes32": 1121468416,
+    "ao_cache_mirror_released_call": 10,
+    "xc_switch_call": 10,
+    "cderi_prebuilt": false,
+    "k_switch": "K mixed precision not requested or not a hybrid",
+    "wall_stock_s": 3.08,
+    "wall_mixed_s": 2.213
+   },
+   {
+    "mol": "paracetamol",
+    "xc": "b3lyp",
+    "e_stock": -515.6676423604478,
+    "e_mixed": -515.6676423604475,
+    "abs_de": 2.2737367544323206e-13,
+    "cycles_stock": 12,
+    "cycles_mixed": 12,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 10,
+    "n_k_fp32": 8,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": 9,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 3.13 GiB, tier fp64+fp32",
+    "xc_switch": "|dE_xc|=2.540e-04 < 0.0003",
+    "ao_cache_tier": "fp64+fp32",
+    "xc_path": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 3,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 2242936832,
+    "ao_cache_bytes32": 1121468416,
+    "ao_cache_mirror_released_call": 11,
+    "xc_switch_call": 11,
+    "cderi_prebuilt": true,
+    "k_switch": "|dE_xc|=8.252e-04 < 0.001",
+    "wall_stock_s": 1.951,
+    "wall_mixed_s": 1.128
+   },
+   {
+    "mol": "paracetamol",
+    "xc": "wb97m-v",
+    "e_stock": -515.4755007112857,
+    "e_mixed": -515.4755007112857,
+    "abs_de": 0.0,
+    "cycles_stock": 12,
+    "cycles_mixed": 12,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 0,
+    "n_k_fp32": 0,
+    "xc_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": null,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 2.09 GiB, tier fp64",
+    "xc_switch": "XC mixed precision not requested",
+    "ao_cache_tier": "fp64",
+    "xc_path": [
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 13,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 2242936832,
+    "ao_cache_bytes32": 0,
+    "ao_cache_mirror_released_call": null,
+    "xc_switch_call": 0,
+    "cderi_prebuilt": true,
+    "k_switch": "K mixed precision not requested or not a hybrid",
+    "wall_stock_s": 19.226,
+    "wall_mixed_s": 6.827,
+    "vv10_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "df64",
+     "df64",
+     "df64",
+     "df64",
+     "df64",
+     "df64"
+    ],
+    "vv10_n_fp32": 7,
+    "vv10_n_df64": 6,
+    "vv10_n_masked": [
+     213680,
+     213895,
+     214064,
+     213956,
+     213943,
+     213941,
+     213945,
+     213944,
+     213944,
+     213944,
+     213944,
+     213944,
+     213944
+    ],
+    "vv10_switch_call": 8,
+    "vv10_switch_reason": "|dE_nlc|=4.328e-06 < 1e-05",
+    "vv10_kernel": {
+     "fp32": {
+      "variant": "f32_t1_hilo",
+      "entry": "vv10_uwe_f32_f32_t1_hilo",
+      "status": "built"
+     },
+     "df64": {
+      "variant": "df64_f32_t1",
+      "entry": "vv10_uwe_df64_f32_t1",
+      "status": "built"
+     }
+    },
+    "vv10_cert": {
+     "call": 13,
+     "rel": {
+      "E": 6.392485190927334e-14,
+      "U": 6.865957633928944e-14,
+      "W": 6.869077325916293e-14
+     },
+     "denlc": 2.009883112241983e-15,
+     "band_rel": 1e-10,
+     "band_denlc": 1e-11,
+     "ok": true,
+     "wall_s": 1.1725465599993186,
+     "error": null
+    },
+    "vv10_cert_wall_share": 0.1718,
+    "tail_precision": {
+     "xc": "fp64",
+     "k": "fp64",
+     "vv10": "df64"
+    }
+   },
+   {
+    "mol": "propranolol",
+    "xc": "r2scan",
+    "e_stock": -827.3346047559603,
+    "e_mixed": -827.3346047559608,
+    "abs_de": 4.547473508864641e-13,
+    "cycles_stock": 13,
+    "cycles_mixed": 13,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 8,
+    "n_k_fp32": 0,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": null,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 8.08 GiB, tier fp64+fp32",
+    "xc_switch": "|dE_xc|=6.573e-04 < 0.001",
+    "ao_cache_tier": "fp64+fp32",
+    "xc_path": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 6,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 5784076288,
+    "ao_cache_bytes32": 2892038144,
+    "ao_cache_mirror_released_call": 9,
+    "xc_switch_call": 9,
+    "cderi_prebuilt": false,
+    "k_switch": "K mixed precision not requested or not a hybrid",
+    "wall_stock_s": 8.648,
+    "wall_mixed_s": 5.642
+   },
+   {
+    "mol": "propranolol",
+    "xc": "b3lyp",
+    "e_stock": -827.8170690321272,
+    "e_mixed": -827.8170690321263,
+    "abs_de": 9.094947017729282e-13,
+    "cycles_stock": 12,
+    "cycles_mixed": 12,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 9,
+    "n_k_fp32": 8,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": 9,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 8.08 GiB, tier fp64+fp32",
+    "xc_switch": "|dE_xc|=2.894e-04 < 0.0003",
+    "ao_cache_tier": "fp64+fp32",
+    "xc_path": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 4,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 5784076288,
+    "ao_cache_bytes32": 2892038144,
+    "ao_cache_mirror_released_call": 10,
+    "xc_switch_call": 10,
+    "cderi_prebuilt": true,
+    "k_switch": "|dE_xc|=4.688e-04 < 0.001",
+    "wall_stock_s": 6.126,
+    "wall_mixed_s": 3.498
+   },
+   {
+    "mol": "propranolol",
+    "xc": "wb97m-v",
+    "e_stock": -827.4681502314984,
+    "e_mixed": -827.4681502314984,
+    "abs_de": 0.0,
+    "cycles_stock": 12,
+    "cycles_mixed": 12,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 0,
+    "n_k_fp32": 0,
+    "xc_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": null,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 5.39 GiB, tier fp64",
+    "xc_switch": "XC mixed precision not requested",
+    "ao_cache_tier": "fp64",
+    "xc_path": [
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 13,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 5784076288,
+    "ao_cache_bytes32": 0,
+    "ao_cache_mirror_released_call": null,
+    "xc_switch_call": 0,
+    "cderi_prebuilt": true,
+    "k_switch": "K mixed precision not requested or not a hybrid",
+    "wall_stock_s": 70.868,
+    "wall_mixed_s": 23.386,
+    "vv10_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "df64",
+     "df64",
+     "df64",
+     "df64",
+     "df64",
+     "df64"
+    ],
+    "vv10_n_fp32": 7,
+    "vv10_n_df64": 6,
+    "vv10_n_masked": [
+     408855,
+     409453,
+     409559,
+     409490,
+     409480,
+     409486,
+     409487,
+     409487,
+     409487,
+     409487,
+     409487,
+     409487,
+     409487
+    ],
+    "vv10_switch_call": 8,
+    "vv10_switch_reason": "|dE_nlc|=1.398e-06 < 1e-05",
+    "vv10_kernel": {
+     "fp32": {
+      "variant": "f32_t1_hilo",
+      "entry": "vv10_uwe_f32_f32_t1_hilo",
+      "status": "built"
+     },
+     "df64": {
+      "variant": "df64_f32_t1",
+      "entry": "vv10_uwe_df64_f32_t1",
+      "status": "built"
+     }
+    },
+    "vv10_cert": {
+     "call": 13,
+     "rel": {
+      "E": 1.6576849459518502e-13,
+      "U": 1.4804784606644093e-13,
+      "W": 9.049382415150666e-14
+     },
+     "denlc": 1.0618765697067572e-14,
+     "band_rel": 1e-10,
+     "band_denlc": 1e-11,
+     "ok": true,
+     "wall_s": 4.473819810998975,
+     "error": null
+    },
+    "vv10_cert_wall_share": 0.1913,
+    "tail_precision": {
+     "xc": "fp64",
+     "k": "fp64",
+     "vv10": "df64"
+    }
+   },
+   {
+    "mol": "celecoxib",
+    "xc": "r2scan",
+    "e_stock": -1668.3950499430098,
+    "e_mixed": -1668.3950499430098,
+    "abs_de": 0.0,
+    "cycles_stock": 14,
+    "cycles_mixed": 14,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 9,
+    "n_k_fp32": 0,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": null,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 10.28 GiB, tier fp64+fp32",
+    "xc_switch": "|dE_xc|=1.688e-04 < 0.001",
+    "ao_cache_tier": "fp64+fp32",
+    "xc_path": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 6,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 7358906368,
+    "ao_cache_bytes32": 3679453184,
+    "ao_cache_mirror_released_call": 10,
+    "xc_switch_call": 10,
+    "cderi_prebuilt": false,
+    "k_switch": "K mixed precision not requested or not a hybrid",
+    "wall_stock_s": 12.821,
+    "wall_mixed_s": 7.972
+   },
+   {
+    "mol": "celecoxib",
+    "xc": "b3lyp",
+    "e_stock": -1669.0626236851208,
+    "e_mixed": -1669.062623685118,
+    "abs_de": 2.7284841053187847e-12,
+    "cycles_stock": 13,
+    "cycles_mixed": 13,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 11,
+    "n_k_fp32": 8,
+    "xc_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": 9,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 10.28 GiB, tier fp64+fp32",
+    "xc_switch": "|dE_xc|=8.343e-06 < 0.0003",
+    "ao_cache_tier": "fp64+fp32",
+    "xc_path": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 3,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 7358906368,
+    "ao_cache_bytes32": 3679453184,
+    "ao_cache_mirror_released_call": 12,
+    "xc_switch_call": 12,
+    "cderi_prebuilt": true,
+    "k_switch": "|dE_xc|=7.346e-04 < 0.001",
+    "wall_stock_s": 10.661,
+    "wall_mixed_s": 5.68
+   },
+   {
+    "mol": "celecoxib",
+    "xc": "wb97m-v",
+    "e_stock": -1668.649608403021,
+    "e_mixed": -1668.64960840302,
+    "abs_de": 9.094947017729282e-13,
+    "cycles_stock": 13,
+    "cycles_mixed": 13,
+    "converged": [
+     true,
+     true
+    ],
+    "n_xc_fp32": 0,
+    "n_k_fp32": 0,
+    "xc_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_calls": [
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64",
+     "fp64"
+    ],
+    "k_full_rebuild_call": null,
+    "fp64_tail": true,
+    "forced": "",
+    "ao_cache": "built: 6.85 GiB, tier fp64",
+    "xc_switch": "XC mixed precision not requested",
+    "ao_cache_tier": "fp64",
+    "xc_path": [
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached",
+     "fp64-cached"
+    ],
+    "xc_fp64_cached": 14,
+    "xc_fp64_stock": 0,
+    "ao_cache_bytes64": 7358906368,
+    "ao_cache_bytes32": 0,
+    "ao_cache_mirror_released_call": null,
+    "xc_switch_call": 0,
+    "cderi_prebuilt": true,
+    "k_switch": "K mixed precision not requested or not a hybrid",
+    "wall_stock_s": 92.639,
+    "wall_mixed_s": 34.572,
+    "vv10_calls": [
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "fp32",
+     "df64",
+     "df64",
+     "df64",
+     "df64",
+     "df64",
+     "df64",
+     "df64"
+    ],
+    "vv10_n_fp32": 7,
+    "vv10_n_df64": 7,
+    "vv10_n_masked": [
+     440424,
+     440606,
+     440706,
+     440616,
+     440617,
+     440625,
+     440627,
+     440625,
+     440624,
+     440624,
+     440624,
+     440624,
+     440624,
+     440624
+    ],
+    "vv10_switch_call": 8,
+    "vv10_switch_reason": "|dE_nlc|=6.563e-06 < 1e-05",
+    "vv10_kernel": {
+     "fp32": {
+      "variant": "f32_t1_hilo",
+      "entry": "vv10_uwe_f32_f32_t1_hilo",
+      "status": "built"
+     },
+     "df64": {
+      "variant": "df64_f32_t1",
+      "entry": "vv10_uwe_df64_f32_t1",
+      "status": "built"
+     }
+    },
+    "vv10_cert": {
+     "call": 14,
+     "rel": {
+      "E": 1.409704039758309e-13,
+      "U": 1.7171220945241626e-13,
+      "W": 1.247360040239221e-13
+     },
+     "denlc": 1.224431318195688e-14,
+     "band_rel": 1e-10,
+     "band_denlc": 1e-11,
+     "ok": true,
+     "wall_s": 5.077216550998855,
+     "error": null
+    },
+    "vv10_cert_wall_share": 0.1469,
+    "tail_precision": {
+     "xc": "fp64",
+     "k": "fp64",
+     "vv10": "df64"
+    }
+   }
+  ],
+  "problems": []
+ }
+}

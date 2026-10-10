@@ -1,0 +1,290 @@
+{
+ "run_id": "38024957471-1-f3c8d125",
+ "status": "PASS",
+ "fork": "chris-lee-mc/gpu4pyscf",
+ "sha": "4d2f3de4c244a6f11debbf44e17d61900c845fc6",
+ "base_sha": "c1a6e371d1a46afc9932c618108a4bc70e895edf",
+ "cuda_arch": "70-real",
+ "profile": "v100-ci",
+ "problems": [],
+ "gate_set": [
+  "G1",
+  "G2",
+  "G3",
+  "G4",
+  "G5",
+  "G6",
+  "G7"
+ ],
+ "gates_skipped_by_profile": [
+  "G8"
+ ],
+ "gpu": "Tesla V100-SXM2-16GB, 7.0",
+ "pytest_version": "pytest 9.1.1",
+ "nvcc": [
+  "Build cuda_12.8.r12.8/compiler.35583870_0"
+ ],
+ "git": {
+  "head": "4d2f3de4c244a6f11debbf44e17d61900c845fc6",
+  "base": "c1a6e371d1a46afc9932c618108a4bc70e895edf",
+  "base_is_ancestor": true,
+  "rc": [
+   0,
+   0,
+   0
+  ]
+ },
+ "changed": [
+  [
+   "M",
+   "README.md"
+  ],
+  [
+   "M",
+   "gpu4pyscf/df/df_jk.py"
+  ],
+  [
+   "A",
+   "gpu4pyscf/dft/mixed_precision.py"
+  ],
+  [
+   "M",
+   "gpu4pyscf/dft/numint.py"
+  ],
+  [
+   "M",
+   "gpu4pyscf/dft/rks.py"
+  ],
+  [
+   "A",
+   "gpu4pyscf/dft/tests/test_mixed_precision.py"
+  ],
+  [
+   "A",
+   "gpu4pyscf/dft/tests/test_mixed_precision_vv10.py"
+  ],
+  [
+   "A",
+   "gpu4pyscf/dft/vv10_mixed.py"
+  ],
+  [
+   "M",
+   "gpu4pyscf/scf/hf.py"
+  ]
+ ],
+ "base_requirements": {
+  "sha256": "d2bbc7653cee1b15e12be4bb8adb282dd02de7ba08dc7701e4d97a771a24a6a1",
+  "pins": {
+   "cutensor-cu12": "2.2.0",
+   "gpu4pyscf-libxc-cuda12x": "0.8.1",
+   "cupy-cuda12x": "13.4.1",
+   "pyscf": "2.14.0",
+   "basis-set-exchange": "0.11",
+   "pyscf-dispersion": "1.5.0",
+   "geometric": "1.1.0"
+  }
+ },
+ "profile_install": [
+  {
+   "args": [
+    "-r",
+    "/tmp/g4psrc/base-requirements.txt"
+   ],
+   "rc": 0,
+   "tail": [
+    "WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning."
+   ]
+  },
+  {
+   "args": [
+    "gpu4pyscf-libxc-cuda12x==0.9.0"
+   ],
+   "rc": 0,
+   "tail": [
+    "ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.",
+    "gpu4pyscf-cuda12x 1.8.1 requires gpu4pyscf-libxc-cuda12x==0.8.1, but you have gpu4pyscf-libxc-cuda12x 0.9.0 which is incompatible.",
+    "WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning."
+   ]
+  }
+ ],
+ "versions_expected": {
+  "pyscf": "2.14.0",
+  "gpu4pyscf-libxc-cuda12x": "0.9.0"
+ },
+ "versions": {
+  "pyscf": "2.14.0",
+  "cupy-cuda12x": "13.4.1",
+  "scipy": "1.15.3",
+  "gpu4pyscf-libxc-cuda12x": "0.9.0",
+  "cutensor-cu12": "2.2.0",
+  "numpy": "2.2.6"
+ },
+ "build_tools_missing": [],
+ "build": {
+  "configure_rc": 0,
+  "build_rc": 0,
+  "jobs": 80,
+  "wall_s": 361.8,
+  "libs": [
+   "gpu4pyscf/lib/libcupy_helper.so",
+   "gpu4pyscf/lib/libgdft.so",
+   "gpu4pyscf/lib/libgecp.so",
+   "gpu4pyscf/lib/libgint.so",
+   "gpu4pyscf/lib/libgvhf.so",
+   "gpu4pyscf/lib/libgvhf_md.so",
+   "gpu4pyscf/lib/libgvhf_rys.so",
+   "gpu4pyscf/lib/libmgrid_v2.so",
+   "gpu4pyscf/lib/libmgrid_v3.so",
+   "gpu4pyscf/lib/libpbc.so",
+   "gpu4pyscf/lib/libsem.so",
+   "gpu4pyscf/lib/libsolvent.so"
+  ]
+ },
+ "wheel_removed": {
+  "rc": 0,
+  "after": "NONE",
+  "raw": "G4PSRC_WHEEL after NONE"
+ },
+ "smoke": {
+  "base": {
+   "rc": 0,
+   "libxc": "/usr/local/lib/python3.10/dist-packages/gpu4pyscf/lib/deps/lib/libxc.so",
+   "package": "/tmp/g4psrc/base/gpu4pyscf/__init__.py",
+   "cupy_helper": "/tmp/g4psrc/base/gpu4pyscf/lib/libcupy_helper.so",
+   "contract_engine": "None",
+   "tail": [
+    "G4PSRC_SMOKE package /tmp/g4psrc/base/gpu4pyscf/__init__.py",
+    "G4PSRC_SMOKE cupy_helper /tmp/g4psrc/base/gpu4pyscf/lib/libcupy_helper.so",
+    "G4PSRC_SMOKE contract_engine None"
+   ]
+  },
+  "branch": {
+   "rc": 0,
+   "libxc": "/usr/local/lib/python3.10/dist-packages/gpu4pyscf/lib/deps/lib/libxc.so",
+   "package": "/tmp/g4psrc/fork/gpu4pyscf/__init__.py",
+   "cupy_helper": "/tmp/g4psrc/fork/gpu4pyscf/lib/libcupy_helper.so",
+   "contract_engine": "None",
+   "tail": [
+    "G4PSRC_SMOKE package /tmp/g4psrc/fork/gpu4pyscf/__init__.py",
+    "G4PSRC_SMOKE cupy_helper /tmp/g4psrc/fork/gpu4pyscf/lib/libcupy_helper.so",
+    "G4PSRC_SMOKE contract_engine None"
+   ]
+  }
+ },
+ "pytest": {
+  "regression_base": {
+   "rc": 1,
+   "wall_s": 119.5,
+   "counts": {
+    "passed": 44,
+    "failed": 1,
+    "skipped": 0
+   },
+   "imported_from": "/tmp/g4psrc/base/gpu4pyscf/__init__.py",
+   "failed": {
+    "gpu4pyscf__dft__tests__test_rks.KnownValues::test_nr_coach": "KeyError: \"LibXCFunctional: name 'COACH' not found.\""
+   },
+   "tail": [
+    "=========================== short test summary info ============================",
+    "FAILED gpu4pyscf__dft__tests__test_rks.py::KnownValues::test_nr_coach - KeyEr...",
+    "1 failed, 44 passed in 117.66s (0:01:57)"
+   ]
+  },
+  "regression_branch": {
+   "rc": 1,
+   "wall_s": 92.4,
+   "counts": {
+    "passed": 44,
+    "failed": 1,
+    "skipped": 0
+   },
+   "imported_from": "/tmp/g4psrc/fork/gpu4pyscf/__init__.py",
+   "failed": {
+    "gpu4pyscf__dft__tests__test_rks.KnownValues::test_nr_coach": "KeyError: \"LibXCFunctional: name 'COACH' not found.\""
+   },
+   "tail": [
+    "=========================== short test summary info ============================",
+    "FAILED gpu4pyscf__dft__tests__test_rks.py::KnownValues::test_nr_coach - KeyEr...",
+    "1 failed, 44 passed in 90.65s (0:01:30)"
+   ]
+  },
+  "new_tests": {
+   "rc": 0,
+   "wall_s": 132.8,
+   "counts": {
+    "passed": 50,
+    "failed": 0,
+    "skipped": 0
+   },
+   "imported_from": "/tmp/g4psrc/fork/gpu4pyscf/__init__.py",
+   "failed": {},
+   "tail": [
+    "1.51s call     gpu4pyscf__dft__tests__test_mixed_precision.py::KnownValues::test_r2scan_xc_water",
+    "1.50s call     gpu4pyscf__dft__tests__test_mixed_precision.py::KnownValues::test_r2scan_xc_water_without_density_fitting",
+    "50 passed in 130.99s (0:02:10)"
+   ],
+   "durations": [
+    "18.29s call     gpu4pyscf__dft__tests__test_mixed_precision_vv10.py::KnownValues::test_vv10_paracetamol",
+    "17.53s call     gpu4pyscf__dft__tests__test_mixed_precision_vv10.py::KnownValues::test_kernels_against_stock_vv10nlc",
+    "11.77s call     gpu4pyscf__dft__tests__test_mixed_precision.py::AOCache::test_fp64_cached_is_bitwise_stock_nr_rks",
+    "10.03s call     gpu4pyscf__dft__tests__test_mixed_precision.py::KnownValues::test_nr_rks_fp32_matches_stock_nr_rks",
+    "8.61s call     gpu4pyscf__dft__tests__test_mixed_precision_vv10.py::KnownValues::test_vv10_water_without_density_fitting",
+    "7.95s call     gpu4pyscf__dft__tests__test_mixed_precision.py::KnownValues::test_r2scan_xc_paracetamol",
+    "5.07s call     gpu4pyscf__dft__tests__test_mixed_precision.py::KnownValues::test_pbe_xc_paracetamol",
+    "5.06s call     gpu4pyscf__dft__tests__test_mixed_precision.py::KnownValues::test_k_only_paracetamol",
+    "4.99s call     gpu4pyscf__dft__tests__test_mixed_precision.py::KnownValues::test_b3lyp_xc_k_paracetamol",
+    "4.99s call     gpu4pyscf__dft__tests__test_mixed_precision.py::KnownValues::test_against_cpu_pyscf",
+    "4.74s call     gpu4pyscf__dft__tests__test_mixed_precision.py::KnownValues::test_convergence_waits_for_fp64_tail",
+    "3.59s call     gpu4pyscf__dft__tests__test_mixed_precision.py::KnownValues::test_scanner_geometry_change",
+    "3.46s call     gpu4pyscf__dft__tests__test_mixed_precision.py::AOCache::test_cache_is_opt_in",
+    "2.59s call     gpu4pyscf__dft__tests__test_mixed_precision.py::AOCache::test_cache_on_off_r2scan_and_b3lyp",
+    "2.56s call     gpu4pyscf__dft__tests__test_mixed_precision.py::AOCache::test_cache_vv10_only_policy",
+    "2.40s call     gpu4pyscf__dft__tests__test_mixed_precision_vv10.py::KnownValues::test_all_off_is_stock",
+    "2.16s call     gpu4pyscf__dft__tests__test_mixed_precision.py::AOCache::test_tier_fp32_when_fp64_does_not_fit",
+    "1.64s call     gpu4pyscf__dft__tests__test_mixed_precision.py::AOCache::test_tier_none_when_nothing_fits",
+    "1.51s call     gpu4pyscf__dft__tests__test_mixed_precision.py::KnownValues::test_r2scan_xc_water",
+    "1.50s call     gpu4pyscf__dft__tests__test_mixed_precision.py::KnownValues::test_r2scan_xc_water_without_density_fitting"
+   ]
+  }
+ },
+ "regressions": [],
+ "identity": {
+  "problems": [],
+  "files": {
+   "vv10_mixed": "/tmp/g4psrc/fork/gpu4pyscf/dft/vv10_mixed.py",
+   "specvv10": "/tmp/r/src/scf_specialized/specvv10.py"
+  },
+  "consts": {
+   "VV10_KERNEL_SRC": true,
+   "VV10_DF64_KERNEL_SRC": true,
+   "FP32_VARIANT": true,
+   "DF64_VARIANT": true,
+   "VV10_SWITCH_TOL": true,
+   "VVDF_REL": true,
+   "VVDF_DENLC": true,
+   "NVRTC_OPTIONS": true
+  },
+  "kernel": {
+   "fp32": {
+    "variant": "f32_t1_hilo",
+    "entry": "vv10_uwe_f32_f32_t1_hilo",
+    "status": "built"
+   },
+   "df64": {
+    "variant": "df64_f32_t1",
+    "entry": "vv10_uwe_df64_f32_t1",
+    "status": "built"
+   }
+  },
+  "bitwise": {
+   "probe_df64/f32": "identical (9 points)",
+   "probe_df64/df64": "identical (9 points)",
+   "shell/f32": "identical (2000 points)",
+   "shell/df64": "identical (2000 points)"
+  },
+  "wall_s": 8.8
+ },
+ "trio": {
+  "skipped_by_profile": "v100-ci"
+ }
+}
