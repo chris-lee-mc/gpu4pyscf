@@ -92,7 +92,7 @@ flake8 --config .flake8 gpu4pyscf
 - [ ] On the package branch, this returns nothing:
 
       ```
-      git grep -n -i -E 'claude|opus|gpt|anthropic|runpod_api|api_key' -- benchmarks/mixed_precision \
+      git grep -n -i -E 'claude|opus|sonnet|haiku|fable|gpt|anthropic|runpod_api|api_key' -- benchmarks/mixed_precision \
         ':!benchmarks/mixed_precision/native/provenance/harness' \
         ':!benchmarks/mixed_precision/rfc/CHECKLIST.md' \
         ':!benchmarks/mixed_precision/rfc/verify_rfc.py'
@@ -105,7 +105,7 @@ flake8 --config .flake8 gpu4pyscf
       `lib/gdft/nr_eval_gto.cu` on master). This returns nothing:
 
       ```
-      git diff upstream/master mixed-precision-upstream | grep -i -E '^\+.*(claude|opus|gpt|anthropic|runpod_api|api_key)'
+      git diff upstream/master mixed-precision-upstream | grep -i -E '^\+.*(claude|opus|sonnet|haiku|fable|gpt|anthropic|runpod_api|api_key)'
       ```
 - [ ] **The harness copy is exempt on purpose.** `native/provenance/harness/` is a byte-for-byte
       snapshot of the benchmark harness at the commit that produced the data, so it is not edited.
@@ -117,7 +117,7 @@ flake8 --config .flake8 gpu4pyscf
       - `rfcbench_sets.py` 1 and `scfbench_requirements.lock` 1: comments citing that
         repository's `.claude/skills/` notes and `CLAUDE.md`.
       Check that nothing else has appeared. This should total 7, in those four files:
-      `git grep -c -i -E 'claude|opus|gpt|anthropic|runpod_api|api_key' -- benchmarks/mixed_precision/native/provenance/harness`
+      `git grep -c -i -E 'claude|opus|sonnet|haiku|fable|gpt|anthropic|runpod_api|api_key' -- benchmarks/mixed_precision/native/provenance/harness`
 - [ ] The package branch is pushed and the links in `RFC_ISSUE.md` resolve (they point at the
       `mixed-precision-upstream` tree and at `benchmarks/mixed_precision/` on
       `mixed-precision-rfc-package-v2`).

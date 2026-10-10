@@ -207,7 +207,7 @@ ALLOWLIST = {
     "24": "CLAIMS C1: 24 molecules",
 }
 
-FORBIDDEN = ["claude", "opus", "anthropic", "gpt-", "openai", "runpod_api", "api_key",
+FORBIDDEN = ["claude", "opus", "sonnet", "haiku", "fable", "anthropic", "gpt-", "openai", "runpod_api", "api_key",
              "api key", "secret"]
 GEO_OPTIONS = ["diis_reset_at_switch", "warm_start_gorb", "DIIS reset", "warm-start rule"]
 

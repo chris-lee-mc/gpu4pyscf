@@ -10,7 +10,7 @@ written before the dispatch they govern.
 - The principle: gradients are summed only in FP64. Similar disciplines apply: FP64 accumulators,
   FP64 tails and certificates.
 - The owner approved pods for any promising path with a hypothesis.
-- The analysis was an independent Fable 5.1 review. It produced the hypotheses below. Its central
+- The analysis was an independent review (see Erratum 1). It produced the hypotheses below. Its central
   finding was checked against the raw sentinels before this protocol was written (PREREG-4
   erratum 2).
 
@@ -329,3 +329,11 @@ and 928× (r2SCAN) inside the banked stock-control envelopes. The step counts ar
   cycles, and endpoints within 1e-5 Å. Its SCF gain on warm steps is 1.41–1.44 on this card.
 - **Gradients run stock, in FP64 end to end.** That is unchanged.
 - **The two new options do not help**, and neither enters the RFC.
+
+### Erratum 1 (2026-10-10, redaction; no number, gate or reading changes)
+
+Line 13, under "Why", named the AI model that performed the independent review. It now reads "an
+independent review". The owner decided on 2026-10-10 that no protocol in this repository, or in
+the fork package that mirrors it, names an AI model. This is the only change. Every number, gate,
+prediction and reading above is byte-identical to the committed RESULT. The pre-redaction text
+remains in git history at `origin/main` before this erratum.

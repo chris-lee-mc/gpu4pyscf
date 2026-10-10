@@ -17,10 +17,11 @@ against `data/pods.csv`.
   to the ones the pods read.
 
 `prereg/` mirrors `docs/upstream/PREREG-rfcbench-*.md` of `chris-lee-mc/gpu-conformer-engine`, including the errata (PR #229)
-PREREG-7's RESULT and errata (PR #231), PREREG-8's RESULT (PR #236) and PREREG-4's erratum 2
-(PR #237), all merged into that repository's `main`. PREREG-9 and its RESULT are mirrored from
-that repository's commit `57844f04` (on its PREREG-9 branch, not yet merged into `main`); the
-protocol text above the RESULT is byte-identical in `e1cc2bb5`, the commit both of its pods ran.
+PREREG-7's RESULT and errata (PR #231), PREREG-8's RESULT (PR #236) and its Erratum 1 (PR #245,
+a one-line redaction of an AI model's name; no number changes), PREREG-4's erratum 2 (PR #237) and
+PREREG-9 with its RESULT (PR #243), all merged into that repository's `main`. PREREG-9's protocol
+text above the RESULT is byte-identical in `e1cc2bb5`, the commit both of its pods ran, which `main`
+keeps in its history (merged, not rebased).
 
 Fork under test: `chris-lee-mc/gpu4pyscf` at `63af0568d4fd19935bef51b7fd71f161a9cee56f`, overlaid
 on `gpu4pyscf-cuda12x==1.8.1` with the lock in `../requirements.lock` and `cutensor-cu12==2.3.1`.
