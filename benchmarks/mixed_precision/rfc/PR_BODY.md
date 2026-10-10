@@ -22,13 +22,15 @@ Gradients and Hessians are untouched.
 Target: GPUs whose FP64 throughput is a small fraction of FP32. Measured with this code against
 stock GPU4PySCF on an RTX PRO 6000 Blackwell Workstation, 24 drug-like molecules (20–44 atoms),
 def2-mTZVPP, three warm pairs per cell, at the settings listed under Evidence (not the library
-defaults): r2SCAN 1.657, B3LYP 1.783, wB97M-V 2.914 (mixed/stock geomeans). On the H100 and A100
-tested the FP32 switch is slower than stock (wB97M-V 0.577–0.615 on the H100), and the code does
-not detect that device class; see Limitations.
+defaults): r2SCAN 1.657, B3LYP 1.783, wB97M-V 2.914 (mixed/stock geomeans). At the library
+defaults (the default pruned grid, no AO cache, the policies exactly as above), on three of those
+molecules: r2SCAN 1.577, B3LYP 1.636, wB97M-V 3.094. On the H100 and A100 tested the FP32 switch
+is slower than stock (wB97M-V 0.577–0.615 on the H100), and the code does not detect that device
+class; see Limitations.
 
 ## Reviewer's guide
 
-Read in this order. Diff: +2915 / −39 over nine files, of which +2070 / −39 is code outside the
+Read in this order. Diff: +2931 / −39 over nine files, of which +2070 / −39 is code outside the
 tests and README.
 
 | order | file | what it does |
@@ -39,7 +41,7 @@ tests and README.
 | 4 | `gpu4pyscf/dft/rks.py` (+45 / −4) | `get_veff` (non-DF): the same protocol; on the first FP64 K iteration after FP32 K it drops `vj_last` so J is rebuilt from the full density (a guard: FP32 K is refused without DF). `KohnShamDFT`: `mixed_precision = None` class attribute and two `_keys` entries |
 | 5 | `gpu4pyscf/dft/numint.py` (+29 / −20) | `_vv10nlc(..., uwe_kernel=None)` and `nr_nlc_vxc(..., vv10_kernel=None)`: with `None` the stock statements run unchanged |
 | 6 | `gpu4pyscf/dft/vv10_mixed.py` (new, +915) | FP32 and df64 VV10 U/W/E kernels (NVRTC via `cupy.RawModule`, no fast-math), bound once per device after a forced probe; `uwe_stock`; `certify` |
-| 7 | `gpu4pyscf/dft/tests/test_mixed_precision.py` (31 tests), `test_mixed_precision_vv10.py` (18 tests) | below |
+| 7 | `gpu4pyscf/dft/tests/test_mixed_precision.py` (32 tests), `test_mixed_precision_vv10.py` (18 tests) | below |
 | 8 | `README.md` | one line under experimental features |
 
 **Default-off guarantee.** With `mf.mixed_precision` unset, `scf()` finds no policy and runs the
@@ -84,14 +86,23 @@ bitwise equal to `nr_rks` (`test_fp64_cached_is_bitwise_stock_nr_rks`, with a ne
 
 Full detail, protocols, raw per-run data and the script that recomputes every number:
 `benchmarks/mixed_precision/native/` on the fork's `mixed-precision-rfc-package-v2` branch
-(`CLAIMS.md`, `verify_native.py`). Measured configuration, which differs from the library
-defaults: `ao_cache_fp64=True`, grid level 3 with `grids.prune = None`, B3LYP `xc_switch_tol=3e-4`,
-cuTENSOR 2.3.1, def2-mTZVPP / def2-tzvpp-jkfit, `conv_tol=1e-9`, default `conv_tol_grad`.
+(`CLAIMS.md`, `verify_native.py`). Most of it is in the campaign configuration, which differs
+from the library defaults: `ao_cache_fp64=True`, grid level 3 with `grids.prune = None`, B3LYP
+`xc_switch_tol=3e-4`, cuTENSOR 2.3.1, def2-mTZVPP / def2-tzvpp-jkfit, `conv_tol=1e-9`, default
+`conv_tol_grad`. The library defaults were measured separately on three molecules (CLAIMS C7).
 
-- **Speed** (CLAIMS C1, C2): r2SCAN 1.657 (per-cell 1.523–1.871), B3LYP 1.783 (1.584–1.994),
-  wB97M-V 2.914 (2.593–3.250, five pods on three cards). Six molecules of 63–98 atoms: r2SCAN
-  1.931, B3LYP 1.338. B3LYP's gain falls with size because the J/K stage, about half the stock
-  SCF at 475–559 Da, gains only 5–7 % while XC gains 2–3×.
+- **Speed at the library defaults** (CLAIMS C7; paracetamol, propranolol, celecoxib; the default
+  grid with `nwchem_prune`, no AO cache, default tolerances, the policies as in the Summary; one
+  RTX PRO 6000 Workstation): r2SCAN 1.577 (per-cell 1.505–1.661), B3LYP 1.636 (1.561–1.728),
+  wB97M-V 3.094 (2.875–3.258). The FP32 switch without the cache on the unpruned grid: 1.627 /
+  1.954 / 2.884. The same pods re-ran the campaign configuration on those molecules at 1.678 /
+  1.968 / 2.944 against the banked 1.638 / 1.860 / 2.803; B3LYP and wB97M-V are +0.108 and +0.141
+  past the ±0.10 replication band, both faster (REPLICATION-FLAG; the figures below are not
+  revised).
+- **Speed, campaign configuration** (CLAIMS C1, C2): r2SCAN 1.657 (per-cell 1.523–1.871), B3LYP
+  1.783 (1.584–1.994), wB97M-V 2.914 (2.593–3.250, five pods on three cards). Six molecules of
+  63–98 atoms: r2SCAN 1.931, B3LYP 1.338. B3LYP's gain falls with size because the J/K stage,
+  about half the stock SCF at 475–559 Da, gains only 5–7 % while XC gains 2–3×.
 - **FP64-strong cards** (CLAIMS C3): L40S pays (1.729 / 1.524 / 2.994 for r2SCAN / B3LYP /
   wB97M-V). H100: 1.320–1.398 / 0.905–1.021 / 0.577–0.615; the r2SCAN gain there is almost all
   the FP64 AO cache (FP32 switch alone 1.084). A100: 11 of 12 clean cells neutral or slower.
@@ -107,33 +118,64 @@ cuTENSOR 2.3.1, def2-mTZVPP / def2-tzvpp-jkfit, `conv_tol=1e-9`, default `conv_t
 
 ## Test plan
 
-- **New tests, 49** (`dft/tests/test_mixed_precision.py`, 31; `test_mixed_precision_vv10.py`, 18):
+- **New tests, 50** (`dft/tests/test_mixed_precision.py`, 32; `test_mixed_precision_vv10.py`, 18):
   the default is `None` and an all-off policy is stock; enabled vs stock at r2SCAN, PBE, B3LYP,
   K-only, and XC without DF (\|ΔE\| ≤ 1e-8 Ha, cycles ±1, an FP64 tail, FP32 really used); against
   CPU PySCF; the convergence guard with every other trigger disabled (a forced switch); each
-  refusal; the memory fallback; scanner geometry change and state cleared after `kernel()`; the
-  FP32 XC and chunked FP32 K kernels against their FP64 counterparts; the FP64 AO cache (bitwise
-  stock for LDA/GGA/meta-GGA, tiers, invalidation, empty-block refusal, opt-in default); the VV10
-  kernels per point against stock `_vv10nlc`, the df64 tail, the certificate (including a
-  perturbed result that must fail it), an SCF that raises, and the all-off policy.
-- **GPU validation of this branch on master `c1a6e37`** (`g4psrc r3`, engine-repo run
-  `38017282503`; gpu4pyscf built from source for sm_120 on one RTX PRO 6000 Blackwell):
-  - upstream `df/tests/test_df_rks.py`, `df/tests/test_df_jk.py`, `dft/tests/test_rks.py`,
-    `scf/tests/test_scf.py`: **44 passed, 1 skipped on master, and the same on this branch**;
-  - the new tests: **49/49**;
-  - the VV10 kernels bitwise identical on the GPU to their NumPy emulations;
-  - stock vs mixed on paracetamol, propranolol and celecoxib: **\|ΔE\| ≤ 6.4e-12 Ha with identical
-    cycle counts** and an FP64 tail in every run.
-- Earlier validations of the same code overlaid on the v1.8.1 wheel (`benchmarks/mixed_precision/validation/`)
-  passed the same gates. Other architectures and upstream's full suite were not run.
+  refusal, including multi-GPU with a patched device count; the memory fallback; scanner geometry
+  change and state cleared after `kernel()`; the FP32 XC and chunked FP32 K kernels against their
+  FP64 counterparts; the FP64 AO cache (bitwise stock for LDA/GGA/meta-GGA, tiers, invalidation,
+  empty-block refusal, opt-in default); the VV10 kernels per point against stock `_vv10nlc`, the
+  df64 tail, the certificate (including a perturbed result that must fail it), an SCF that raises,
+  and the all-off policy.
+- **GPU validation of this branch (`4d2f3de`) on master `c1a6e37`** (`g4psrc r4`, three profiles;
+  gpu4pyscf built from source each time, the released wheel removed, each tree importing itself):
+  - **`pro6000-lock`** (engine-repo run `38022477235`; sm_120, one RTX PRO 6000 Blackwell, the
+    validation lock's pins): upstream `df/tests/test_df_rks.py`, `df/tests/test_df_jk.py`,
+    `dft/tests/test_rks.py`, `scf/tests/test_scf.py` give **44 passed, 1 skipped on master, and
+    the same on this branch**; the new tests **50/50**; the VV10 kernels bitwise identical on the
+    GPU to their NumPy emulations; stock vs mixed on paracetamol, propranolol and celecoxib
+    **\|ΔE\| ≤ 5.9e-12 Ha with identical cycle counts** and an FP64 tail in every run;
+  - **`pro6000-pyscf28`** (run `38023769024`; the same card, upstream's `requirements.txt` then
+    **pyscf 2.8**, the multi-GPU CI job's pin): the same gates, 44 passed + 1 skipped on both trees,
+    50/50, **\|ΔE\| ≤ 2.7e-12 Ha**;
+  - **`v100-ci`** (run `38024957471`; **one Tesla V100, sm_70**, built from source for sm_70,
+    upstream's `requirements.txt` then **libxc 0.9.0**, the single-GPU CI job's set): regression
+    files, new tests (**50/50 in 133 s**) and VV10 bitwise identity pass; the three-molecule
+    comparison was not run there (its bands are banked on the PRO 6000).
+- Earlier validations (r1–r3 on earlier master commits, and the same code overlaid on the v1.8.1
+  wheel; `benchmarks/mixed_precision/validation/`) passed the same gates. A multi-GPU host, scipy
+  1.17 and upstream's full suite were not run.
+
+### CI fit
+
+- **Multi-GPU runner.** `check_supported` refuses `num_devices > 1`. Every test class that runs an
+  SCF with a policy carries `@unittest.skipIf(num_devices > 1, ...)`, the pattern upstream's own
+  tests use, so the 2×T4 job skips them; the refusal itself is asserted by `MultiGPU` with a
+  patched device count, so it runs on any host.
+- **V100 job.** sm_70 needs nothing special: the VV10 kernels are NVRTC `cupy.RawModule`s with
+  `--std=c++14` and no `__CUDA_ARCH__` branching (intrinsics `__fadd_rn`, `__fsub_rn`,
+  `__fmul_rn`, `__syncthreads`, `__longlong_as_double`). On one V100 the 50 tests take 133 s
+  serially, the slowest 18.3 s (`test_vv10_paracetamol`); the rest are under 18 s each.
+- **Pins.** Passes under pyscf 2.8 and under libxc 0.9.0 (above). With libxc 0.9.0, upstream's own
+  `test_rks.py::test_nr_coach` fails on master and on this branch alike (`COACH` is not in that
+  wheel); it is unrelated to this change. scipy 1.17 was not tested.
 
 ## Limitations
 
-- **Speed numbers are at non-default settings** (above). The defaults and pruned grids are not
-  measured.
+- **Most speed numbers are at non-default settings** (above). The library defaults are measured
+  only on three molecules, one card and one basis.
 - **FP64-strong GPUs.** The FP32 switch is slower on the H100 and A100 tested, and nothing in the
   code warns or refuses there. Only two FP64:FP32 throughput levels were measured, so no threshold
   is established. Open question: a device guard by compute capability, or documentation only?
+- **At the library defaults** (CLAIMS C7, three molecules, one RTX PRO 6000): every reading PAYS
+  (≥ 1.15 by the campaign's rule): r2SCAN 1.577, B3LYP 1.636, wB97M-V 3.094 trio geomeans. The
+  default grid has about 0.63 of the unpruned grid's points and stock is 1.356 / 1.278 / 1.035
+  faster on it; without the cache on the unpruned grid the mode reads 1.627 / 1.954 / 2.884. One
+  pre-registered prediction missed: B3LYP without the cache, 1.954 against 1.65–1.90, the cache
+  adding only 1.007 for B3LYP. The same pods read the campaign configuration +0.108 (B3LYP) and
+  +0.141 (wB97M-V) above the banked trio, past the ±0.10 replication band, both faster
+  (REPLICATION-FLAG).
 - **Cold start.** On a fresh Blackwell machine the first SCF took 64–168 s. It is the CUDA
   driver's JIT cache, paid once per machine; stock pays it too (134.0 s when it runs first). It is
   not the mode's cost.
