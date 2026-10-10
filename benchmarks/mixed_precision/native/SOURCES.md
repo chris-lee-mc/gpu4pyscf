@@ -3,7 +3,9 @@
 Every CSV in `data/` was extracted from one pod's result sentinel, on the `ci-bus` branch of
 `chris-lee-mc/gpu-conformer-engine`. The extractor was `.github/scripts/rfcbench_extract.py`
 (`--run-id <RUN_ID> --csv`), at the commit that merged each RESULT (for PREREG-7, whose RESULT
-is not yet merged, at `d05888b8`; the extractor is byte-identical on the RESULT's branch). A sentinel's line 2 is
+is not yet merged, at `d05888b8`; the extractor is byte-identical on the RESULT's branch; for
+PREREG-9 at `e1cc2bb5`, the commit its pods ran, which is the extractor shipped in `provenance/`
+and re-extracts every earlier CSV unchanged). A sentinel's line 2 is
 `RUN_ID=<RUN_ID>`, and each CSV row carries the same `run_id`; `verify_native.py` checks that
 against `data/pods.csv`.
 
@@ -16,7 +18,9 @@ against `data/pods.csv`.
 
 `prereg/` mirrors `docs/upstream/PREREG-rfcbench-*.md` of `chris-lee-mc/gpu-conformer-engine`, including the errata (PR #229)
 PREREG-7's RESULT and errata (PR #231), PREREG-8's RESULT (PR #236) and PREREG-4's erratum 2
-(PR #237), all merged into that repository's `main`.
+(PR #237), all merged into that repository's `main`. PREREG-9 and its RESULT are mirrored from
+that repository's commit `57844f04` (on its PREREG-9 branch, not yet merged into `main`); the
+protocol text above the RESULT is byte-identical in `e1cc2bb5`, the commit both of its pods ran.
 
 Fork under test: `chris-lee-mc/gpu4pyscf` at `63af0568d4fd19935bef51b7fd71f161a9cee56f`, overlaid
 on `gpu4pyscf-cuda12x==1.8.1` with the lock in `../requirements.lock` and `cutensor-cu12==2.3.1`.
@@ -39,6 +43,8 @@ on `gpu4pyscf-cuda12x==1.8.1` with the lock in `../requirements.lock` and `cuten
 | `f1b` | PREREG-6 F1b | `37386887345` | `e9b75f37` | RTX PRO 6000 Blackwell Server Edition | 1g.24gb | 93.96 | False | 3 | 0 | False | PASS |
 | `g1` | PREREG-8 G1 | `37738477503` | `5013b101` | RTX PRO 6000 Blackwell Workstation Edition | — | 42.35 | False | — (9 runs) | — | — | PASS |
 | `l12` | PREREG-1 L12 | `36968109711` | `78a3412e` | RTX PRO 6000 Blackwell Workstation Edition | — | 78.11 | False | 48 | 0 | False | PASS |
+| `ld1` | PREREG-9 LD1 (library defaults: paracetamol, propranolol) | `38025861073` | `e1cc2bb5` | RTX PRO 6000 Blackwell Workstation Edition | — | 43.44 | False | — (6 `defaults` cells, 5 arms) | 1 | False | PASS |
+| `ld2` | PREREG-9 LD2 (library defaults: celecoxib) | `38027495744` | `e1cc2bb5` | RTX PRO 6000 Blackwell Workstation Edition | — | 36.13 | False | — (3 `defaults` cells, 5 arms) | 0 | False | PASS |
 | `l12r` | PREREG-7 L12r (DEGRADED) | `37540378856` | `d05888b8` | RTX PRO 6000 Blackwell Workstation Edition | — | 53.77 | False | 48 | 19 | True | PASS |
 | `l12r2` | PREREG-7 L12r2 (DEGRADED) | `37544474854` | `d05888b8` | RTX PRO 6000 Blackwell Workstation Edition | — | 63.24 | False | 48 | 21 | True | PASS |
 | `m0` | PREREG-5 M0 | `37073279025` | `3890e545` | RTX PRO 6000 Blackwell Server Edition | — | 72.27 | False | 8 | 1 | False | PASS |
@@ -75,6 +81,13 @@ are written by the same extractor (`extra_rows`).
 PREREG-8's pods (A1, A2, G1) ran fork `09271907` (`mixed-precision-geo`, validated by g4pport run
 `37725279648`). Their CSVs carry one row per arm. The full gradient and dipole vectors (A1, A2) and
 the per-step records (G1) are in the sentinels, and `verify_native.py` N10 reads them from there.
+PREREG-9's pods (LD1, LD2; mode `defaults`) ran the campaign fork tree `63af0568` again, on harness
+commit `e1cc2bb5` of the engine repository, which added the `defaults` mode (five arms per pair on
+two grids). That harness is not snapshotted in `provenance/harness/` (which stays at `5013b101`);
+its extractor is. Their CSVs carry one row per arm and pair, like the speed CSVs, with the arm
+names `mixed-default`, `mixed-nocache-campaign`, `mixed-campaign`, `stock-default` and
+`stock-campaign`; `noisy_cells` counts `defaults` cells (LD1's is paracetamol B3LYP, one arm under
+1 s). `verify_native.py` N11 reads them.
 
 **Not billed, so with no sentinel:**
 - the 5090 capacity refusals: runs `37064884792` and `37073071979`;

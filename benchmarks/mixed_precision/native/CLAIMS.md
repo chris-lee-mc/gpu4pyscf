@@ -17,9 +17,13 @@ cannot be verified** and the **ledger** at the end.
 | basis | def2-mTZVPP / def2-tzvpp-jkfit unless stated | — |
 
 Unpruned grids make XC a larger share of the run, and XC is the part the FP32 switch speeds up. They
-also make the AO cache larger, which moves the MIG fit limits. **No number here measures the
-defaults, nor the README's example `MixedPrecision(xc=True, k=True)`.** Expect smaller gains on
-pruned grids. How much smaller is not measured.
+also make the AO cache larger, which moves the MIG fit limits. Call the table above the **campaign
+configuration**. **Only C7 measures the library defaults** (the default grid with `nwchem_prune`,
+`ao_cache_fp64=False`, the default tolerances, and the README's own `MixedPrecision(xc=True)`,
+`(xc=True, k=True)` and `(vv10=True)`), on three molecules and one card: r2SCAN 1.577, B3LYP 1.636,
+wB97M-V 3.094. Every other number in this file is in the campaign configuration. On the trio the
+defaults read lower than the campaign configuration for r2SCAN and B3LYP (by 0.10 and 0.33) and
+higher for wB97M-V (by 0.15); beyond the trio, how the two compare is not measured.
 
 **Method.**
 - R = 3 warm pairs per cell, plus one cold pair that is reported but excluded.
@@ -46,7 +50,11 @@ pruned grids. How much smaller is not measured.
 
 ## C1. RTX PRO 6000 (Blackwell, FP64-limited): the mode pays for every functional tested `[N1]`
 
-| 24 drug-like molecules, 20–44 atoms | mixed/stock geomean | S / M / L tiers | per-cell range | pods |
+**Scope: the campaign configuration** (FP64 AO cache on, unpruned grid, B3LYP `xc_switch_tol=3e-4`;
+the table at the top), one card family (RTX PRO 6000 Workstation), one pod for r2SCAN and B3LYP.
+The same mode at the **library defaults** is C7, on the trio only.
+
+| 24 drug-like molecules, 20–44 atoms, campaign configuration | mixed/stock geomean | S / M / L tiers | per-cell range | pods |
 |---|---|---|---|---|
 | r2SCAN | **1.657** | 1.576 / 1.665 / 1.804 | 1.523–1.871 | 1 (L12), replicated below |
 | B3LYP | **1.783** | 1.736 / 1.779 / 1.897 | 1.584–1.994 | 1 (L12), replicated below |
@@ -305,6 +313,115 @@ M with R. The S arm was recorded in every sentinel but never read (see the ledge
     SCF, so its whole-optimisation total is not a speed reading. The table quotes the
     warm-start-rule arm, whose steps were identical.
 
+## C7. Library defaults (the trio, one card): the mode still pays; less than the campaign configuration for r2SCAN and B3LYP, more for wB97M-V `[N11]`
+
+**Setup** (PREREG-9, pods LD1 and LD2, two RTX PRO 6000 Workstation pods, fork tree `63af0568`, the
+1.8.1-overlay build, as for every speed number here):
+- paracetamol, propranolol and celecoxib × r2SCAN, B3LYP and wB97M-V; def2-mTZVPP /
+  def2-tzvpp-jkfit; `conv_tol 1e-9`; R = 3 warm pairs plus a cold pair, as in C1;
+- **five arms per pair**, every mixed arm before both stock arms (stock last, with the warm pool):
+
+  | arm | grid | policy |
+  |---|---|---|
+  | `mixed-default` | **the library default**: level 3, `nwchem_prune`, `mf.grids` untouched | **the README's**: `MixedPrecision(xc=True)` / `(xc=True, k=True)` / `(vv10=True)`, every other field at its default (`ao_cache_fp64=False`, `xc_switch_tol=1e-3`) |
+  | `mixed-nocache-campaign` | campaign: level 3, `prune = None` | the campaign policy without the cache (`ao_cache_fp64=False`; B3LYP `xc_switch_tol=3e-4`) |
+  | `mixed-campaign` | campaign | the campaign policy, as in C1 (`ao_cache_fp64=True`) |
+  | `stock-default` | the library default | none |
+  | `stock-campaign` | campaign | none |
+
+- A reading pairs each mixed arm with the stock arm **on the same grid**, stock median / mixed
+  median over the warm pairs. The three readings per cell are the library-default number, the FP32
+  switch without the cache, and a same-pod **anchor** to C1.
+- Policies, grid level and prune function, `ngrids`, cache tiers and switch calls were read back off
+  `mf` on every arm (observation, not labels); every cell is `OK` and `TREATED`.
+
+| trio geomean | **`mixed-default/stock-default`** (library defaults) | `mixed-nocache-campaign/stock-campaign` (no cache, campaign grid) | `mixed-campaign/stock-campaign` (the anchor) | C1's 24-molecule campaign figure, for reference |
+|---|---|---|---|---|
+| r2SCAN | **1.577** | 1.627 | 1.678 | 1.657 |
+| B3LYP | **1.636** | 1.954 | 1.968 (REPLICATION-FLAG) | 1.783 |
+| wB97M-V | **3.094** | 2.884 | 2.944 (REPLICATION-FLAG) | 2.914 |
+
+Per cell:
+
+| cell | `mixed-default/stock-default` | `mixed-nocache-campaign/stock-campaign` | `mixed-campaign/stock-campaign` |
+|---|---|---|---|
+| paracetamol r2SCAN | 1.505 | 1.597 | 1.645 |
+| propranolol r2SCAN | 1.570 | 1.608 | 1.650 |
+| celecoxib r2SCAN | 1.661 | 1.677 | 1.742 |
+| paracetamol B3LYP | 1.561 | 1.992 (REPLICATION-FLAG) | 1.962 (NOISY, warm walls under 1 s; REPLICATION-FLAG) |
+| propranolol B3LYP | 1.728 | 1.932 (REPLICATION-FLAG) | 1.958 (REPLICATION-FLAG) |
+| celecoxib B3LYP | 1.622 | 1.939 (REPLICATION-FLAG) | 1.985 (REPLICATION-FLAG) |
+| paracetamol wB97M-V | 3.162 | 2.905 (REPLICATION-FLAG) | 3.016 (REPLICATION-FLAG) |
+| propranolol wB97M-V | 3.258 | 3.055 (REPLICATION-FLAG) | 3.095 (REPLICATION-FLAG) |
+| celecoxib wB97M-V | 2.875 | 2.703 (REPLICATION-FLAG) | 2.734 (REPLICATION-FLAG) |
+
+- Every one of the 27 readings is PAYS (≥ 1.15). The per-cell ranges at the defaults are
+  1.505–1.661 (r2SCAN), 1.561–1.728 (B3LYP) and 2.875–3.258 (wB97M-V).
+- **The pre-registered falsifier did not fire.** It was "r2SCAN `mixed-default/stock-default` below
+  1.15 on a quotable trio"; the trio reads 1.577, on two pods neither DEGRADED nor CONTENDED. The
+  RFC may keep its framing, but must state the library-default numbers beside the campaign ones.
+- **Predictions**, fixed before dispatch:
+
+  | | prediction (band) | measured | |
+  |---|---|---|---|
+  | P-1 r2SCAN, defaults | 1.50 (1.35–1.65) | 1.577 | MET |
+  | P-2 B3LYP, defaults | 1.45 (1.25–1.65) | 1.636 | MET |
+  | P-3 wB97M-V, defaults | 3.05 (2.85–3.35) | 3.094 | MET |
+  | P-4 r2SCAN, no cache | 1.57 (1.45–1.70) | 1.627 | MET |
+  | P-4 B3LYP, no cache | 1.80 (1.65–1.90) | 1.954 | **MODEL-MISS, above the band** |
+  | P-4 wB97M-V, no cache | 2.78 (2.60–3.10) | 2.884 | MET |
+
+  - P-3's same-pod corollary held in all three wB97M-V cells: `mixed-default/stock-default` ≥
+    `mixed-campaign/stock-campaign`. Pruning removes stock time the mode does not accelerate, while
+    VV10, the accelerated part, runs on `mf.nlcgrids`, which no arm changes (level 3, `nwchem_prune`
+    on all 45 arms).
+  - **The B3LYP miss runs the other way from the model: the cache matters less than modelled.**
+    `mixed-campaign/mixed-nocache-campaign` is 1.007 for B3LYP (0.985–1.024 per cell), 1.032 for
+    r2SCAN and 1.021 for wB97M-V. The prediction had been scaled down from the banked anchor
+    (1.860), which these pods exceeded (next item).
+- **Anchor check** (`mixed-campaign/stock-campaign` against the banked C1 trio, ±0.10; the banked
+  values are the protocol's, 1.638 / 1.860 / 2.803, recomputed here from L12 and from W1/W4r):
+  - r2SCAN **REPLICATED**: 1.678, Δ +0.040.
+  - B3LYP **REPLICATION-FLAG**: 1.968, Δ +0.108.
+  - wB97M-V **REPLICATION-FLAG**: 2.944, Δ +0.141.
+  - Both flags are in the **faster** direction, in every cell: B3LYP +0.07 to +0.14, wB97M-V +0.11
+    to +0.17 per cell against the banked cell values; every r2SCAN cell is above its banked value
+    too. The LD pods' `stock-campaign` walls are 0.93–0.99 of the banked pods' stock medians, so this
+    is a faster pod on the same tree, as X3r was a slower one on the H100 (C3).
+  - Against the unrounded banked geomeans the deltas are +0.041 / +0.109 / +0.142; the verdicts do
+    not change.
+  - The flags are shown beside every B3LYP and wB97M-V number from these pods that uses the campaign
+    grid. The library-default numbers have no banked comparator and carry no flag. **The C1
+    headlines are not revised**: they are banked from their own pods.
+- **Disclosed, not gated.**
+  - **Grid size.** Default/campaign `ngrids` is 0.632 (paracetamol), 0.634 (propranolol) and 0.626
+    (celecoxib), about 0.63, inside the disclosed band 0.45–0.75. Pruning was observed, not assumed:
+    the default grid has fewer points in every molecule.
+  - **`stock-default/stock-campaign`**, how much faster stock itself is on the default grid: r2SCAN
+    1.356, B3LYP 1.278, wB97M-V 1.035, all inside their disclosed bands (1.2–1.6; 1.0–1.15).
+  - **The grid on the mixed side**, `mixed-default/mixed-nocache-campaign`: r2SCAN 1.315, B3LYP
+    1.070, wB97M-V 1.110.
+  - **The grid's energy difference**, |E_stock-default − E_stock-campaign|: 1.2e-8 to 1.7e-6 Ha over
+    the nine cells. Eight are below the predicted 1e-6; propranolol r2SCAN is above. There is no ΔE
+    gate between the two grids, which solve different quadratures.
+  - **B3LYP's switch tolerance.** At the README's `xc_switch_tol=1e-3` (`mixed-default`), XC ran in
+    FP32 for 8 calls in every cell, against 9–11 at the campaign's 3e-4 (both campaign arms); K ran
+    in FP32 for 8 calls in every B3LYP mixed arm. The tolerance and the grid are confounded in
+    `mixed-default`, by protocol; their separate effects are not measured.
+  - Gates, as computed: every mixed arm within 5.9e-12 Ha of the same-grid stock arm, with identical
+    cycle counts (the gate is ±1) and an FP64 tail; FP32 really used on every mixed arm; cache tiers
+    as pre-registered (`fp32` mirror with zero FP64 bytes on the no-cache r2SCAN/B3LYP arms, no cache
+    on the no-cache wB97M-V arms, `fp64+fp32` / `fp64` on `mixed-campaign`).
+- **Scope.**
+  - One card model (RTX PRO 6000 Workstation), the trio only, def2-mTZVPP only, the 1.8.1-overlay
+    build at `63af0568`. Molecules beyond the trio, other bases, other cards and a master build are
+    not measured at the defaults; the FP64-strong cards (C3) were not re-measured at the defaults.
+  - Not measured: the default policy with the cache on, and the campaign policy on the default grid.
+  - One NOISY arm: LD1 paracetamol B3LYP `mixed-campaign`, whose warm walls are under 1 s. Neither
+    pod is DEGRADED (idle 43.4 W and 36.1 W). Nothing was re-run; the reserve pod was not used.
+  - The protocol's final text is in the commit both pods ran (`e1cc2bb5`), 46.6 min before the LD1
+    dispatch; LD2 was dispatched after LD1 finished.
+
 ## Deployment notes, not claims: MIG and a concurrent whole card `[N5, N6, N7, N8]`
 
 **This was C5. It is no longer a claim of the RFC.**
@@ -426,7 +543,10 @@ is a fresh process with the caches as shown. Cold extra = cold wall − warm wal
     contain them. PREREG-7's final text, by contrast, is in the commit every PREREG-7 pod ran
     (`d05888b8`), 7.5 min before the first dispatch.
   - **The exact harness bytes.** `provenance/harness/` is the harness at `5013b101`, the commit
-    the PREREG-8 pods ran. Every earlier pod ran at the earlier commit listed in `pods.csv`.
+    the PREREG-8 pods ran. Every earlier pod ran at the earlier commit listed in `pods.csv`. The
+    PREREG-9 pods (LD1, LD2) ran at `e1cc2bb5`, which adds the `defaults` mode; that harness is
+    **not** snapshotted here, only its extractor (`provenance/rfcbench_extract.py`), which
+    re-extracts every earlier CSV unchanged (group P2).
 - **Dates.** A few status dates and one RESULT date in `prereg/` are a day late. See the ledger.
 - **`reproduce_native.py`** transcribes the measurement path and has not been run on a GPU in this
   form.
@@ -436,7 +556,8 @@ is a fresh process with the caches as shown. Cold extra = cold wall − warm wal
 - **Untouched by the mode:** gradients and Hessians run stock.
 - **Refused:** range-separated XC and K. The VV10 component alone handles wB97M-V.
 - **Not measured:**
-  - library-default settings and pruned grids;
+  - library-default settings beyond C7's scope: the trio on one PRO 6000 Workstation at def2-mTZVPP
+    is measured; the 24-molecule ladder, the larger molecules, other bases and other cards are not;
   - running without cuTENSOR;
   - UKS and multi-GPU;
   - the RTX 5090;
@@ -483,9 +604,18 @@ is a fresh process with the caches as shown. Cold extra = cold wall − warm wal
   - ST2: FP32 K was predicted to harm on a MIG slice, but J/K stock/mixed is 1.09 (ST2r);
   - CC1: G4 stock 0.96 and mixed 1.02, against predictions of 1.3 and 1.4; the MPS uplift of +0.56
     and +0.73, against a prediction of 0 to +0.3.
+- PREREG-9: P-4 B3LYP, the FP32 switch without the cache on the campaign grid (predicted 1.80, band
+  1.65–1.90): measured 1.954, above the band. The model had scaled the banked anchor down by a cache
+  effect of about 4 %; the measured cache effect for B3LYP is 1.007.
 
 **Replication falsifier fired:** PREREG-7 X3r. H100 B3LYP mixed/stock moved by 0.115 (> 0.10), so it
 is quoted as the range 0.905–1.021. The L12 replication's falsifier did not fire.
+
+**Replication flags (PREREG-9 anchor, not a falsifier):** LD1/LD2 `mixed-campaign/stock-campaign`
+read +0.108 (B3LYP) and +0.141 (wB97M-V) above the banked trio, past the ±0.10 band, in the faster
+direction; r2SCAN replicated (+0.040). The C1 headlines are not revised; the flags are shown beside
+the campaign-grid B3LYP and wB97M-V numbers from those pods (C7). PREREG-9's own falsifier (r2SCAN
+at the defaults below 1.15) did not fire.
 
 **Wrong or withdrawn predictions:**
 - PREREG-6: the three r2SCAN DF-placement predictions (withdrawn by Amendment 1: no tensor is

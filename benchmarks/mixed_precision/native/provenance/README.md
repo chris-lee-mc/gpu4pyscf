@@ -4,17 +4,19 @@
 - `sentinels/<csv>.txt`: the result file each pod wrote, one per CSV in `../data/`. Line 2 is the
   pod's `RUN_ID`, and its SHA256 is in `../data/pods.csv` (`sentinel_sha256`).
 - `rfcbench_extract.py`: the extractor, stdlib-only, as on `chris-lee-mc/gpu-conformer-engine`
-  `main` at `5013b101`, the commit the PREREG-8 pods ran. It writes the extra-mode and PREREG-8
-  CSVs too, and re-extracts every earlier CSV unchanged.
-- `harness/`: a read-only snapshot of the harness at that same commit:
+  at `e1cc2bb5`, the commit the PREREG-9 pods ran. It writes the extra-mode, PREREG-8 and PREREG-9
+  (`defaults`) CSVs too, and re-extracts every earlier CSV unchanged (group P2 proves this on all
+  46). `harness/rfcbench_extract.py` is the older copy at `5013b101`, kept with its snapshot.
+- `harness/`: a read-only snapshot of the harness at `5013b101`, the commit the PREREG-8 pods ran:
   - the pod measurement code (`rfcbench_cells.py`, `rfcbench_pod.py`, and `rfcbench_extra.py` for
     PREREG-7's cold-start, stage-timing and concurrency modes);
   - the cell sets and estimates (`rfcbench_sets.py`);
   - the launcher (`runpod_rfcbench.py`), the dispatch workflow, the calibration, and the pinned
     Python lock.
-- `TIMELINE.csv`: every protocol commit (PREREG-rfcbench-0 to -8), interleaved with every pod's run
+- `TIMELINE.csv`: every protocol commit (PREREG-rfcbench-0 to -9), interleaved with every pod's run
   creation and completion times. It was missing from the package's first version (an ignore rule
-  kept it out of git), and has been regenerated from the same sources.
+  kept it out of git), and has been regenerated from the same sources; the PREREG-9 update
+  regenerated it again (same generator, same sources) and reproduced every earlier row.
 
 ## What `../verify_native.py` checks from these (group P2)
 
@@ -44,4 +46,7 @@ check the whole chain sentinel → CSV → claim without access to the private r
   ran at the commits listed in `pods.csv` (`repo_sha`). Between those commits the speed-cell path
   changed only by adding the DF-placement recorder, the extractor's per-basis grouping, and PREREG-7's
   optional stage hook, which is off for speed cells. The snapshot shows the method; it is not the
-  exact bytes every earlier pod ran.
+  exact bytes every earlier pod ran. The PREREG-9 pods (LD1, LD2) ran a later commit, `e1cc2bb5`,
+  which adds the `defaults` mode; that harness is not snapshotted here (only its extractor is), so
+  the five-arm, two-grid measurement path is described by `../prereg/PREREG-rfcbench-9-library-defaults.md`
+  and attested by what the sentinels record (settings read back off `mf` on every arm).

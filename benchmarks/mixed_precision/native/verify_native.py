@@ -11,7 +11,10 @@ Definitions (prereg/PREREG-rfcbench-0-measurand.md, sections 3-4; the extractor 
 RESULTs uses the same):
   - a cell's wall for an arm is the MEDIAN over the warm pairs 1..R (pair 0, the cold pair, is
     excluded; a bridge cell has the single pair 1);
-  - ratio "A/B" of a cell = median(B) / median(A), so mixed/stock > 1 means mixed is faster;
+  - ratio "A/B" of a cell = median(B) / median(A), so mixed/stock > 1 means mixed is faster; a
+    PREREG-9 `defaults` cell has five arms and pairs each mixed arm with the stock arm on the same
+    grid (mixed-default/stock-default, mixed-nocache-campaign/stock-campaign,
+    mixed-campaign/stock-campaign);
   - an aggregate is the geometric mean of per-cell ratios;
   - spread of an arm = (max - min) / median over the warm pairs; a cell is NOISY when either arm's
     spread exceeds 10 %; a pod is DEGRADED when more than 20 % of its cells are NOISY;
@@ -652,6 +655,8 @@ check_true("P", "every speed CSV row carries its pod's RUN_ID",
 PROV = os.path.join(HERE, "provenance")
 # PREREG-7's extra-mode pods, pinned (their CSVs have no `key` column).
 EXTRA_PODS = ("cc1", "cs1", "st1", "st2", "st2r")
+# PREREG-9's library-defaults pods, pinned with their cell counts (kind `defaults`, five arms).
+DEFAULTS_PODS = {"ld1": 6, "ld2": 3}
 
 
 def _extractor():
@@ -710,6 +715,11 @@ def _flags_match(name):
         return (common and out.get("mode") in ("coldstart", "stages", "concur")
                 and (p["speed_cells"], p["noisy_cells"], p["degraded"]) == ("0", "", "")
                 and out["scfs"] == len(rows(name)) > 0)
+    if name in DEFAULTS_PODS:  # PREREG-9: `defaults` cells only (five arms), no speed cells; pinned counts
+        return (common and str(out["noisy"]) == p["noisy_cells"] and str(out["degraded"]) == p["degraded"]
+                and p["speed_cells"] == "0" and len(out["cells"]) == 0
+                and len(out["defaults"]) == DEFAULTS_PODS[name]
+                and all(c["status"] == "OK" and c["fit"] == "TREATED" for c in out["defaults"]))
     return (common and str(out["noisy"]) == p["noisy_cells"] and str(out["degraded"]) == p["degraded"]
             and str(len(out["cells"])) == p["speed_cells"])
 
@@ -1425,6 +1435,260 @@ check("N10", "G1: largest |E_stock(mixed endpoint) - E_S(final)| (Ha)",
       lambda: max(abs(GEO[k][a]["endpoint"]["e"] - GEO[k]["S"]["e_final"]) for k in _G.values() for a in ("M0", "MW")), "3.2e-9")
 
 
+# --------------------------------------------------------------------------------------------- #
+# N11. PREREG-9: the mode at library defaults (LD1, LD2). Cells of kind `defaults`, five arms per
+# pair: mixed-default / stock-default (the library-default grid, level 3 nwchem_prune, no AO cache,
+# the README's policies), mixed-nocache-campaign / mixed-campaign / stock-campaign (the campaign
+# grid). A reading pairs each mixed arm with the stock arm on the SAME grid. The anchor is
+# mixed-campaign/stock-campaign against the banked C1 trio (L12; W1 and W4r for wB97M-V).
+# --------------------------------------------------------------------------------------------- #
+LD = tuple(DEFAULTS_PODS)
+LD_RATIOS = (("mixed-default", "stock-default"), ("mixed-nocache-campaign", "stock-campaign"),
+             ("mixed-campaign", "stock-campaign"))
+LD_ARMS = ("mixed-default", "mixed-nocache-campaign", "mixed-campaign", "stock-default", "stock-campaign")
+LD_CELLS = {  # (mol, xc): the three readings per cell, as printed in the PREREG-9 RESULT table
+    ("paracetamol", "r2scan"): ("1.505", "1.597", "1.645"), ("propranolol", "r2scan"): ("1.570", "1.608", "1.650"),
+    ("celecoxib", "r2scan"): ("1.661", "1.677", "1.742"), ("paracetamol", "b3lyp"): ("1.561", "1.992", "1.962"),
+    ("propranolol", "b3lyp"): ("1.728", "1.932", "1.958"), ("celecoxib", "b3lyp"): ("1.622", "1.939", "1.985"),
+    ("paracetamol", "wb97m-v"): ("3.162", "2.905", "3.016"), ("propranolol", "wb97m-v"): ("3.258", "3.055", "3.095"),
+    ("celecoxib", "wb97m-v"): ("2.875", "2.703", "2.734"),
+}
+for (m, x), vals in LD_CELLS.items():
+    for (a, b), v in zip(LD_RATIOS, vals):
+        check("N11", f"LD {m} {x}: {a}/{b}",
+              lambda m=m, x=x, a=a, b=b: ratio(LD, cell(m, x, kind="defaults"), a, b), v)
+check_true("N11", "LD1 + LD2: the nine trio x functional cells of kind `defaults`, 4 pairs x 5 arms each (180 rows), "
+           "and no speed, bridge or downstream row",
+           lambda: sorted(keys(LD, "defaults", None)) == sorted(cell(m, x, kind="defaults") for m in TRIO for x in XCS3)
+           and all(sorted((r["key"], r["pair"], r["arm"]) for r in rows(p))
+                   == sorted((k, q, a) for k in keys(p, "defaults", None) for q in "0123" for a in LD_ARMS) for p in LD)
+           and sum(len(rows(p)) for p in LD) == 180
+           and all(r["key"].startswith("defaults/") for p in LD for r in rows(p)))
+LD_TRIO = {"r2scan": ("1.577", "1.627", "1.678"), "b3lyp": ("1.636", "1.954", "1.968"),
+           "wb97m-v": ("3.094", "2.884", "2.944")}
+for x, vals in LD_TRIO.items():
+    for (a, b), v in zip(LD_RATIOS, vals):
+        check("N11", f"LD trio geomean {x} {a}/{b}", gm_ratio(LD, x, a, b, mols=TRIO, kind="defaults"), v)
+
+
+def _ld_gm(x, i):
+    a, b = LD_RATIOS[i]
+    return gm_ratio(LD, x, a, b, mols=TRIO, kind="defaults")()
+
+
+def _ld_quotable():
+    return (all(pod(p)["degraded"] == "False" and pod(p)["contended"] == "False" for p in LD)
+            and all(walls(LD, cell(m, x, kind="defaults"), a) for m in TRIO for x in XCS3 for a in LD_ARMS))
+
+
+# The predictions and the falsifier, as fixed in the protocol before any dispatch.
+LD_BANDS = {("r2scan", 0): (1.35, 1.65), ("b3lyp", 0): (1.25, 1.65), ("wb97m-v", 0): (2.85, 3.35),
+            ("r2scan", 1): (1.45, 1.70), ("b3lyp", 1): (1.65, 1.90), ("wb97m-v", 1): (2.60, 3.10)}
+check_true("N11", "PREREG-9 falsifier NOT FIRED: r2SCAN mixed-default/stock-default trio >= 1.15, on a quotable trio "
+           "(every cell complete; neither pod DEGRADED or CONTENDED)",
+           lambda: _ld_gm("r2scan", 0) >= 1.15 and _ld_quotable())
+check_true("N11", "P-1, P-2, P-3 and P-4 (r2SCAN, wB97M-V) MET inside their bands; P-4 B3LYP (1.65-1.90) MODEL-MISS, above",
+           lambda: all(lo <= _ld_gm(x, i) <= hi for (x, i), (lo, hi) in LD_BANDS.items() if (x, i) != ("b3lyp", 1))
+           and _ld_gm("b3lyp", 1) > 1.90)
+check_true("N11", "P-3 corollary: mixed-default/stock-default >= mixed-campaign/stock-campaign in all three wB97M-V cells",
+           lambda: all(ratio(LD, cell(m, "wb97m-v", kind="defaults"), *LD_RATIOS[0])
+                       >= ratio(LD, cell(m, "wb97m-v", kind="defaults"), *LD_RATIOS[2]) for m in TRIO))
+for x, v in (("r2scan", "0.10"), ("b3lyp", "0.33"), ("wb97m-v", "-0.15")):
+    check("N11", f"LD trio {x}: same-pod campaign reading (mixed-campaign/stock-campaign) minus the library-default reading",
+          lambda x=x: _ld_gm(x, 2) - _ld_gm(x, 0), v)
+check_true("N11", "every one of the 27 per-cell readings is PAYS (>= 1.15)",
+           lambda: all(ratio(LD, cell(m, x, kind="defaults"), a, b) >= 1.15
+                       for m in TRIO for x in XCS3 for a, b in LD_RATIOS))
+
+# Anchor: the banked C1 trio as the protocol fixed it (3 decimals), recomputed here from L12 / W1 / W4r.
+LD_BANKED_TRIO = {"r2scan": 1.638, "b3lyp": 1.860, "wb97m-v": 2.803}
+LD_BANKED_CELL = {("r2scan", "paracetamol"): 1.605, ("r2scan", "propranolol"): 1.607, ("r2scan", "celecoxib"): 1.703,
+                  ("b3lyp", "paracetamol"): 1.820, ("b3lyp", "propranolol"): 1.846, ("b3lyp", "celecoxib"): 1.913,
+                  ("wb97m-v", "paracetamol"): 2.843, ("wb97m-v", "propranolol"): 2.986, ("wb97m-v", "celecoxib"): 2.593}
+LD_W_POD = {"paracetamol": "w1", "propranolol": "w4r", "celecoxib": "w1"}
+
+
+def _banked_pod(m, x):
+    return "l12" if x != "wb97m-v" else LD_W_POD[m]
+
+
+def _banked_cell(m, x):
+    return ratio(_banked_pod(m, x), cell(m, x), "mixed", "stock")
+
+
+for x, v in LD_BANKED_TRIO.items():
+    check("N11", f"PREREG-9 anchor: banked C1 trio {x}, recomputed from {'L12' if x != 'wb97m-v' else 'W1/W4r'}",
+          lambda x=x: geomean(_banked_cell(m, x) for m in TRIO), f"{v:.3f}")
+for (x, m), v in LD_BANKED_CELL.items():
+    check("N11", f"PREREG-9 anchor: banked C1 cell {m} {x}, recomputed", lambda m=m, x=x: _banked_cell(m, x), f"{v:.3f}")
+for x, v in (("r2scan", "0.040"), ("b3lyp", "0.108"), ("wb97m-v", "0.141")):
+    check("N11", f"anchor delta {x}: LD mixed-campaign/stock-campaign trio minus the banked {LD_BANKED_TRIO[x]:.3f}",
+          lambda x=x: _ld_gm(x, 2) - LD_BANKED_TRIO[x], v)
+check_true("N11", "anchor verdicts: r2SCAN within +-0.10 (REPLICATED); B3LYP and wB97M-V beyond +0.10, faster "
+           "(REPLICATION-FLAG); the same verdicts against the unrounded banked geomeans",
+           lambda: abs(_ld_gm("r2scan", 2) - LD_BANKED_TRIO["r2scan"]) <= 0.10
+           and all(_ld_gm(x, 2) - LD_BANKED_TRIO[x] > 0.10 for x in ("b3lyp", "wb97m-v"))
+           and abs(_ld_gm("r2scan", 2) - geomean(_banked_cell(m, "r2scan") for m in TRIO)) <= 0.10
+           and all(_ld_gm(x, 2) - geomean(_banked_cell(m, x) for m in TRIO) > 0.10 for x in ("b3lyp", "wb97m-v")))
+
+
+def _cell_delta(x):
+    return [ratio(LD, cell(m, x, kind="defaults"), *LD_RATIOS[2]) - LD_BANKED_CELL[(x, m)] for m in TRIO]
+
+
+for x, lo, hi in (("b3lyp", "0.07", "0.14"), ("wb97m-v", "0.11", "0.17")):
+    check("N11", f"anchor per cell, {x}: lowest LD minus banked", lambda x=x: min(_cell_delta(x)), lo)
+    check("N11", f"anchor per cell, {x}: highest LD minus banked", lambda x=x: max(_cell_delta(x)), hi)
+check_true("N11", "anchor per cell: every one of the nine cells reads above its banked value (a faster pod)",
+           lambda: all(d > 0 for x in XCS3 for d in _cell_delta(x)))
+_ld_stock = lambda: [med(LD, cell(m, x, kind="defaults"), "stock-campaign") / med(_banked_pod(m, x), cell(m, x), "stock")
+                     for x in XCS3 for m in TRIO]
+check("N11", "LD stock-campaign median wall over the banked pod's stock median: lowest of 9 cells", lambda: min(_ld_stock()), "0.93")
+check("N11", "LD stock-campaign median wall over the banked pod's stock median: highest of 9 cells", lambda: max(_ld_stock()), "0.99")
+
+# Disclosed, not gated: the grid on stock, the cache, and the grid on the mixed side.
+for x, (sd, cc, md) in {"r2scan": ("1.356", "1.032", "1.315"), "b3lyp": ("1.278", "1.007", "1.070"),
+                        "wb97m-v": ("1.035", "1.021", "1.110")}.items():
+    check("N11", f"LD trio {x}: stock-default/stock-campaign (the grid, on stock)",
+          gm_ratio(LD, x, "stock-default", "stock-campaign", mols=TRIO, kind="defaults"), sd)
+    check("N11", f"LD trio {x}: mixed-campaign/mixed-nocache-campaign (the cache)",
+          gm_ratio(LD, x, "mixed-campaign", "mixed-nocache-campaign", mols=TRIO, kind="defaults"), cc)
+    check("N11", f"LD trio {x}: mixed-default/mixed-nocache-campaign (the grid, on mixed)",
+          gm_ratio(LD, x, "mixed-default", "mixed-nocache-campaign", mols=TRIO, kind="defaults"), md)
+_ld_cache_b3 = lambda: [ratio(LD, cell(m, "b3lyp", kind="defaults"), "mixed-campaign", "mixed-nocache-campaign") for m in TRIO]
+check("N11", "LD B3LYP per cell, mixed-campaign/mixed-nocache-campaign: lowest", lambda: min(_ld_cache_b3()), "0.985")
+check("N11", "LD B3LYP per cell, mixed-campaign/mixed-nocache-campaign: highest", lambda: max(_ld_cache_b3()), "1.024")
+check_true("N11", "stock-default/stock-campaign inside the disclosed bands: 1.2-1.6 (r2SCAN, B3LYP), 1.0-1.15 (wB97M-V)",
+           lambda: all(1.2 <= gm_ratio(LD, x, "stock-default", "stock-campaign", mols=TRIO, kind="defaults")() <= 1.6
+                       for x in ("r2scan", "b3lyp"))
+           and 1.0 <= gm_ratio(LD, "wb97m-v", "stock-default", "stock-campaign", mols=TRIO, kind="defaults")() <= 1.15)
+
+
+def _ngrids(m, grid):
+    arms = ("mixed-default", "stock-default") if grid == "default" else LD_ARMS[1:3] + LD_ARMS[4:]
+    return one({int(r["ngrids"]) for p in LD for r in rows(p) if r["key"].split("/")[1] == m and r["arm"] in arms})
+
+
+for m, v in (("paracetamol", "0.632"), ("propranolol", "0.634"), ("celecoxib", "0.626")):
+    check("N11", f"LD {m}: default/campaign ngrids", lambda m=m: _ngrids(m, "default") / _ngrids(m, "campaign"), v)
+check_true("N11", "LD: ngrids identical within a grid across arms, functionals and pairs; the default grid has fewer "
+           "points in every molecule (pruning observed); the ratio is inside the disclosed band 0.45-0.75",
+           lambda: all(0.45 <= _ngrids(m, "default") / _ngrids(m, "campaign") <= 0.75 for m in TRIO))
+
+
+def _ld_pairs():
+    out = []
+    for p in LD:
+        by = {}
+        for r in rows(p):
+            by.setdefault((r["key"], r["pair"]), {})[r["arm"]] = r
+        out += [(k, arms) for k, arms in sorted(by.items())]
+    if len(out) != 36 or any(set(a) != set(LD_ARMS) for _, a in out):
+        raise ValueError("expected 36 pairs x 5 arms")
+    return out
+
+
+def _grid_de():
+    return [abs(float(a["stock-default"]["e"]) - float(a["stock-campaign"]["e"])) for _, a in _ld_pairs()]
+
+
+check("N11", "LD |E_stock-default - E_stock-campaign| over every cell and pair: lowest (Ha)", lambda: min(_grid_de()), "1.2e-8")
+check("N11", "LD |E_stock-default - E_stock-campaign| over every cell and pair: highest (Ha)", lambda: max(_grid_de()), "1.7e-6")
+check_true("N11", "LD grid dE: eight of nine cells below the predicted 1e-6 Ha in every pair; propranolol r2SCAN above",
+           lambda: sorted({k[0] for k, a in _ld_pairs()
+                           if abs(float(a["stock-default"]["e"]) - float(a["stock-campaign"]["e"])) >= 1e-6})
+           == [cell("propranolol", "r2scan", kind="defaults")])
+
+
+def _ld_gate_worst():
+    de, dc = 0.0, 0
+    for _, arms in _ld_pairs():
+        for a, s in LD_RATIOS:
+            de = max(de, abs(float(arms[a]["e"]) - float(arms[s]["e"])))
+            dc = max(dc, abs(int(arms[a]["cycles"]) - int(arms[s]["cycles"])))
+    return de, dc
+
+
+check_true("N11", "LD gates on every pair: converged, |dE| <= 1e-8 Ha and cycles within 1 (identical, as it happens) against "
+           "the same-grid stock arm, an FP64 tail on every mixed arm, no error",
+           lambda: _ld_gate_worst()[0] <= 1e-8 and _ld_gate_worst()[1] == 0
+           and all(r["converged"] == "True" and not r["error"] for p in LD for r in rows(p))
+           and all(r["fp64_tail"] == "True" for p in LD for r in rows(p) if r["arm"].startswith("mixed")))
+check("N11", "LD: worst |E_mixed - E_stock| against the same-grid stock arm (Ha)", lambda: _ld_gate_worst()[0], "5.9e-12")
+
+
+def _ld_policy(x, arm):
+    camp = POLICY[(x, "mixed")]
+    nocache = camp.replace("ao_cache_fp64=True", "ao_cache_fp64=False")
+    return {"mixed-campaign": camp, "mixed-nocache-campaign": nocache,
+            "mixed-default": nocache.replace("xc_switch_tol=0.0003", "xc_switch_tol=0.001"),
+            "stock-default": "", "stock-campaign": ""}[arm]
+
+
+check_true("N11", "LD policies as pre-registered: mixed-default is the README policy with every other field at its "
+           "default (ao_cache_fp64=False, xc_switch_tol 1e-3); mixed-nocache-campaign is the campaign policy without "
+           "the cache; mixed-campaign is the campaign policy; stock arms carry none",
+           lambda: all(r["policy"] == _ld_policy(r["key"].split("/")[2], r["arm"]) for p in LD for r in rows(p)))
+check_true("N11", "LD cache tiers observed: fp32 mirror (zero FP64 bytes) on the no-cache r2SCAN/B3LYP arms, no cache "
+           "on the no-cache wB97M-V arms; fp64+fp32 (r2SCAN, B3LYP) and fp64 (wB97M-V) on mixed-campaign",
+           lambda: all(r["ao_cache_tier"] == {"mixed-campaign": tier_expected("ld", r["key"].split("/")[2], "mixed"),
+                                              "mixed-default": "" if "/wb97m-v/" in r["key"] else "fp32",
+                                              "mixed-nocache-campaign": "" if "/wb97m-v/" in r["key"] else "fp32",
+                                              "stock-default": "", "stock-campaign": ""}[r["arm"]]
+                       and (r["arm"] == "mixed-campaign" or r["arm"].startswith("stock")
+                            or r["ao_cache_bytes64"] == "0")
+                       and (r["arm"] != "mixed-campaign" or int(r["ao_cache_bytes64"]) > 0)
+                       for p in LD for r in rows(p)))
+
+
+def _phase(s):
+    return [t.split("*")[0] for t in s.split(",")] if s else []
+
+
+check_true("N11", "LD treatment: every r2SCAN/B3LYP mixed arm ran XC in FP32 first and ended in FP64, B3LYP also K; "
+           "every wB97M-V mixed arm ran VV10 in FP32 first and ended in df64",
+           lambda: all((_phase(r["xc"])[0], _phase(r["xc"])[-1]) == ("fp32", "fp64") for p in LD for r in rows(p)
+                       if r["arm"].startswith("mixed") and "/wb97m-v/" not in r["key"])
+           and all((_phase(r["k"])[0], _phase(r["k"])[-1]) == ("fp32", "fp64") for p in LD for r in rows(p)
+                   if r["arm"].startswith("mixed") and "/b3lyp/" in r["key"])
+           and all((_phase(r["vv10"])[0], _phase(r["vv10"])[-1]) == ("fp32", "df64") for p in LD for r in rows(p)
+                   if r["arm"].startswith("mixed") and "/wb97m-v/" in r["key"]))
+check_true("N11", "LD B3LYP switch: XC in FP32 for 8 calls at the README tolerance 1e-3 (mixed-default) against 9-11 at "
+           "the campaign's 3e-4 (both campaign arms), in every cell; K in FP32 for 8 calls in every B3LYP mixed arm",
+           lambda: {_nfp32(r["xc"]) for p in LD for r in rows(p) if "/b3lyp/" in r["key"] and r["arm"] == "mixed-default"} == {8}
+           and all(9 <= _nfp32(r["xc"]) <= 11 for p in LD for r in rows(p) if "/b3lyp/" in r["key"]
+                   and r["arm"] in ("mixed-nocache-campaign", "mixed-campaign"))
+           and {_nfp32(r["k"]) for p in LD for r in rows(p) if "/b3lyp/" in r["key"] and r["arm"].startswith("mixed")} == {8})
+check_true("N11", "LD NOISY: exactly one arm over 10 % spread, LD1 paracetamol B3LYP mixed-campaign, with warm walls "
+           "under 1 s; neither pod DEGRADED or CONTENDED (pods.csv, re-derived from the sentinels by P2)",
+           lambda: [(p, k, a) for p in LD for k in keys(p, "defaults", None) for a in LD_ARMS if spread(p, k, a) > 0.10]
+           == [("ld1", cell("paracetamol", "b3lyp", kind="defaults"), "mixed-campaign")]
+           and min(walls("ld1", cell("paracetamol", "b3lyp", kind="defaults"), "mixed-campaign")) < 1.0
+           and all((pod(p)["degraded"], pod(p)["contended"]) == ("False", "False") for p in LD)
+           and (pod("ld1")["noisy_cells"], pod("ld2")["noisy_cells"]) == ("1", "0"))
+
+
+def _ld_nlc():
+    X = _extractor()
+    return [c["pod_readings"]["nlc"][a] for p in LD
+            for c in X.extract(_sentinel(p).decode(), pod(p)["run_id"], unquotable=True)["defaults"] for a in LD_ARMS]
+
+
+check_true("N11", "LD VV10 grid read back off mf.nlcgrids on all 45 arms: level 3, nwchem_prune (no arm changed VV10's grid)",
+           lambda: len(_ld_nlc()) == 45 and all(n["nlc_level"] == 3 and n["nlc_prune"] == "nwchem_prune" for n in _ld_nlc()))
+check("N11", "minutes from the PREREG-9 protocol commit (e1cc2bb5, the commit both pods ran) to the LD1 dispatch",
+      lambda: (min(_t(r["time_utc"]) for r in _timeline() if r["kind"] == "run created" and r["what"] == "ld1")
+               - max(_t(r["time_utc"]) for r in _timeline() if r["kind"] == "protocol commit"
+                     and r["what"].startswith("PREREG-rfcbench-9") and r["ref"].startswith("e1cc2bb5"))).total_seconds() / 60,
+      "46.6")
+check_true("N11", "TIMELINE: LD2 was created after LD1 finished (serialised), and the PREREG-9 RESULT commit follows LD2",
+           lambda: (min(_t(r["time_utc"]) for r in _timeline() if r["kind"] == "run created" and r["what"] == "ld2")
+                    >= min(_t(r["time_utc"]) for r in _timeline() if r["kind"] == "run finished" and r["what"] == "ld1"))
+           and (max(_t(r["time_utc"]) for r in _timeline() if r["kind"] == "protocol commit"
+                    and r["what"].startswith("PREREG-rfcbench-9"))
+                > min(_t(r["time_utc"]) for r in _timeline() if r["kind"] == "run finished" and r["what"] == "ld2")))
+
+
 def data_integrity():
     """Every file in data/ must be listed in data/SHA256SUMS with a matching hash, and every listed
     file must exist: a missing, extra or edited data file is a FAIL before any number is read."""
@@ -1448,7 +1712,7 @@ def data_integrity():
     return probs
 
 
-EXPECTED_CHECKS = 845   # pinned: a check that silently disappears (or appears) is a FAIL
+EXPECTED_CHECKS = 947   # pinned: a check that silently disappears (or appears) is a FAIL
 
 
 def main():

@@ -135,3 +135,9 @@ time_utc,kind,what,ref,detail
 2026-10-08T06:56:02Z,protocol commit,PREREG-rfcbench-8-geometry-safety.md,a79ee4e912fd,"PREREG-8 RESULT: tolerance sets the residual (mixed tracks stock at conv_tol_grad 3e-6); DIIS restart rejected; no warm-start penalty, warm-start rule never triggers; geomopt matches stock; bank A1/A2/G1 sentinels"
 2026-10-08T06:56:27Z,protocol commit,PREREG-rfcbench-8-geometry-safety.md,eb88a230d57b,PREREG-8 RESULT: state the tolerance reduction (1.8-22x) and endpoint envelope margins (168x/928x) exactly
 2026-10-08T12:52:15Z,protocol commit,PREREG-rfcbench-8-geometry-safety.md,d3d7d5b40dcc,"PREREG-8 RESULT: the largest warm-step orbital-gradient norm rounds to 43 (42.5), found by the fork verifier"
+2026-10-10T04:11:04Z,protocol commit,PREREG-rfcbench-9-library-defaults.md,e1cc2bb5e577,"rfcbench PREREG-9: the mode at library defaults (mode `defaults`, two pods, not yet run)"
+2026-10-10T04:57:39Z,run created,ld1,38025861073,head e1cc2bb5e577; PREREG-9 LD1
+2026-10-10T05:24:24Z,run finished,ld1,38025861073,success
+2026-10-10T05:26:13Z,run created,ld2,38027495744,head e1cc2bb5e577; PREREG-9 LD2
+2026-10-10T05:53:06Z,run finished,ld2,38027495744,success
+2026-10-10T05:55:24Z,protocol commit,PREREG-rfcbench-9-library-defaults.md,57844f04aba1,"PREREG-9 RESULT: falsifier not fired; library defaults r2SCAN 1.577, B3LYP 1.636, wB97M-V 3.094 (LD1 38025861073, LD2 38027495744)"
