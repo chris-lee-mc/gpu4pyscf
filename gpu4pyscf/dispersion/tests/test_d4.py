@@ -14,9 +14,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
-import pytest
 import pyscf
+import pytest
+
 from gpu4pyscf.dispersion.dftd4 import DFTD4Dispersion
+
 
 def test_d4_unknown_xc():
     mol = pyscf.M(atom='H 0 0 0; H 0 0 1')
@@ -159,3 +161,14 @@ def test_gradient_tpss_d4_charge():
 
     out = model.get_dispersion(grad=True)
     assert np.linalg.norm(out['gradient'] - ref) < 1.0e-7
+
+
+def test_r2scan_3c_custom_damping():
+    mol = pyscf.M(atom='H 0 0 0; H 0 0 1')
+    model = DFTD4Dispersion(mol, xc='r2scan-3c', atm=True, ga=2.0, gc=1.0)
+    model.set_param(0.0, 0.42, 5.65, s9=2.0)
+    out = model.get_dispersion(grad=True)
+    assert 'energy' in out and 'gradient' in out
+    assert not np.isnan(out['energy'])
+    assert out['energy'] < 0.0
+
